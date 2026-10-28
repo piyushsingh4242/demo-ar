@@ -1,0 +1,672 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1,
+                 user-scalable=no" />
+  <title>Aravalli Lifeline AI - AR Navigation</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111827;
+      color: white;
+      font-family: system-ui, sans-serif;
+      touch-action: manipulation;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #ui {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 16px;
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+    }
+
+    #top, #bottom {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      pointer-events: auto;
+    }
+
+    #top {
+      padding: 14px;
+      border-radius: 16px;
+      background: rgba(10, 20, 35, .88);
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 17px;
+      margin: 0 0 7px;
+    }
+
+    #status {
+      font-size: 14px;
+      line-height: 1.45;
+      color: #d1d5db;
+    }
+
+    #bottom {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      flex: 1;
+      min-height: 48px;
+      border: 0;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #start {
+      background: #22c55e;
+      color: #052e16;
+    }
+
+    #reset {
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    #exit {
+      background: #374151;
+      color: white;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    #hint {
+      font-size: 12px;
+      text-align: center;
+      margin: 0 0 10px;
+      color: white;
+      text-shadow: 0 1px 4px black;
+    }
+
+    #crosshair {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: 24px;
+      height: 24px;
+      transform: translate(-50%, -50%);
+      border: 2px solid white;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #000;
+      pointer-events: none;
+      display: none;
+    }
+
+    #crosshair::after {
+      content: "";
+      position: absolute;
+      width: 5px;
+      height: 5px;
+      background: #22c55e;
+      border-radius: 50%;
+      top: 7.5px;
+      left: 7.5px;
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <div id="ui">
+    <div id="top">
+      <h1>Aravalli Lifeline AI</h1>
+      <div id="status">Tap Start AR to begin.</div>
+    </div>
+
+    <div id="bottom">
+      <button id="start">Start AR</button>
+      <button id="reset" disabled>Reset</button>
+      <button id="exit" disabled>Exit</button>
+    </div>
+  </div>
+
+  <div id="crosshair"></div>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    const statusEl = document.getElementById("status");
+    const startBtn = document.getElementById("start");
+    const resetBtn = document.getElementById("reset");
+    const exitBtn = document.getElementById("exit");
+    const crosshair = document.getElementById("crosshair");
+
+    let renderer, scene, camera;
+    let session = null;
+    let referenceSpace = null;
+    let viewerSpace = null;
+    let hitTestSource = null;
+    let currentHit = null;
+    let reticle = null;
+    let route = null;
+
+    // Each waypoint can use a native XRAnchor, if supported.
+    const waypoints = [];
+
+    let busy = false;
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    function makeRenderer() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera();
+
+      renderer = new THREE.WebGLRenderer({
+        alpha: true,
+        antialias: true,
+        powerPreference: "high-performance"
+      });
+
+      renderer.setPixelRatio(
+        Math.min(window.devicePixelRatio || 1, 2)
+      );
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType("local");
+
+      // The real-world camera background is provided by WebXR.
+      renderer.setClearColor(0x000000, 0);
+
+      document.body.insertBefore(
+        renderer.domElement,
+        document.getElementById("ui")
+      );
+
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x64748b, 2));
+
+      reticle = new THREE.Mesh(
+        new THREE.RingGeometry(0.07, 0.10, 32),
+        new THREE.MeshBasicMaterial({
+          color: 0x22c55e,
+          side: THREE.DoubleSide
+        })
+      );
+
+      reticle.rotation.x = -Math.PI / 2;
+      reticle.matrixAutoUpdate = false;
+      reticle.visible = false;
+      scene.add(reticle);
+
+      renderer.setAnimationLoop(renderFrame);
+    }
+
+    function makeMarker(color, label) {
+      const group = new THREE.Group();
+
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.35,
+        roughness: 0.45
+      });
+
+      // Small cylinder sits on the detected surface.
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.10, 0.10, 0.035, 24),
+        material
+      );
+      base.position.y = 0.025;
+      group.add(base);
+
+      // Upright pin.
+      const pin = new THREE.Mesh(
+        new THREE.ConeGeometry(0.055, 0.18, 20),
+        material
+      );
+      pin.position.y = 0.13;
+      group.add(pin);
+
+      // Floating label, using a canvas texture.
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 80;
+
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "rgba(10,20,35,0.9)";
+      ctx.fillRect(0, 0, 256, 80);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 32px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, 128, 40);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthTest: false
+        })
+      );
+
+      sprite.scale.set(0.42, 0.13, 1);
+      sprite.position.y = 0.34;
+      group.add(sprite);
+
+      scene.add(group);
+      return group;
+    }
+
+    async function startAR() {
+      if (busy || session) return;
+      busy = true;
+      startBtn.disabled = true;
+
+      try {
+        if (!navigator.xr) {
+          throw new Error(
+            "WebXR is unavailable. Open this page in a supported " +
+            "Android Chrome browser using HTTPS."
+          );
+        }
+
+        const supported =
+          await navigator.xr.isSessionSupported("immersive-ar");
+
+        if (!supported) {
+          throw new Error(
+            "Immersive AR is not supported on this device/browser."
+          );
+        }
+
+        if (!renderer) makeRenderer();
+
+        // Call requestSession directly from the button action.
+        session = await navigator.xr.requestSession("immersive-ar", {
+          requiredFeatures: ["local", "hit-test"],
+          optionalFeatures: ["anchors", "dom-overlay"],
+          domOverlay: { root: document.getElementById("ui") }
+        });
+
+        renderer.xr.setSession(session);
+
+        referenceSpace = await session.requestReferenceSpace("local");
+        viewerSpace = await session.requestReferenceSpace("viewer");
+
+        hitTestSource =
+          await session.requestHitTestSource({
+            space: viewerSpace
+          });
+
+        session.addEventListener("select", onSelect);
+        session.addEventListener("end", onSessionEnd);
+
+        startBtn.style.display = "none";
+        resetBtn.disabled = false;
+        exitBtn.disabled = false;
+        crosshair.style.display = "block";
+
+        setStatus(
+          "Move your phone slowly to find the floor. " +
+          "Tap to place the Door marker."
+        );
+      } catch (error) {
+        console.error("AR startup failed:", error);
+        setStatus(error.message || "Could not start AR.");
+        startBtn.disabled = false;
+        session = null;
+      } finally {
+        busy = false;
+      }
+    }
+
+    function onSelect() {
+      if (!session || !currentHit) {
+        setStatus("No surface detected yet. Scan the floor.");
+        return;
+      }
+
+      if (waypoints.length >= 2) {
+        setStatus("Route ready. Press Reset to place new points.");
+        return;
+      }
+
+      // Snapshot the hit-test pose when the user taps.
+      const pose = currentHit.getPose(referenceSpace);
+
+      if (!pose) {
+        setStatus("Surface pose unavailable. Try again.");
+        return;
+      }
+
+      const isDoor = waypoints.length === 0;
+      const label = isDoor ? "DOOR" : "BED";
+      const color = isDoor ? 0x22c55e : 0xf97316;
+
+      const marker = makeMarker(color, label);
+      marker.matrixAutoUpdate = false;
+      marker.matrix.fromArray(pose.transform.matrix);
+      marker.matrix.decompose(
+        marker.position,
+        marker.quaternion,
+        marker.scale
+      );
+
+      const waypoint = {
+        marker,
+        anchor: null,
+        fallbackPosition: marker.position.clone(),
+        fallbackQuaternion: marker.quaternion.clone()
+      };
+
+      waypoints.push(waypoint);
+
+      // Native anchors are optional and not supported everywhere.
+      // Keep the saved hit-test pose as a fallback.
+      if (typeof currentHit.createAnchor === "function") {
+        currentHit.createAnchor()
+          .then(anchor => {
+            waypoint.anchor = anchor;
+          })
+          .catch(error => {
+            console.warn("Native anchor unavailable:", error);
+          });
+      }
+
+      if (waypoints.length === 1) {
+        setStatus(
+          "Door placed. Point the reticle at the bed's floor " +
+          "position and tap again."
+        );
+      } else {
+        createRoute();
+        setStatus(
+          "Route created! Follow the floor arrows from DOOR to BED."
+        );
+      }
+    }
+
+    function createRoute() {
+      if (route) {
+        scene.remove(route);
+        route.traverse(object => {
+          if (object.geometry) object.geometry.dispose();
+          if (object.material) {
+            const materials = Array.isArray(object.material)
+              ? object.material
+              : [object.material];
+            materials.forEach(material => material.dispose());
+          }
+        });
+      }
+
+      route = new THREE.Group();
+
+      const start = waypoints[0].marker.position;
+      const end = waypoints[1].marker.position;
+
+      const horizontal = new THREE.Vector3(
+        end.x - start.x, 0, end.z - start.z
+      );
+      const distance = horizontal.length();
+
+      if (distance < 0.05) {
+        setStatus("The points are too close. Reset and try again.");
+        return;
+      }
+
+      // A segmented route of arrows on the floor.
+      const count = Math.max(2, Math.floor(distance / 0.35));
+      const direction = horizontal.normalize();
+
+      for (let i = 0; i <= count; i++) {
+        const t = i / count;
+        const position = new THREE.Vector3().lerpVectors(
+          start, end, t
+        );
+
+        // Small lift avoids z-fighting with the floor.
+        position.y += 0.045;
+
+        const arrow = new THREE.Mesh(
+          new THREE.ConeGeometry(0.045, 0.16, 12),
+          new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            depthTest: true
+          })
+        );
+
+        arrow.position.copy(position);
+        arrow.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          direction
+        );
+
+        route.add(arrow);
+      }
+
+      // Add a thin line for continuity between the arrows.
+      const points = [
+        start.clone().add(new THREE.Vector3(0, 0.035, 0)),
+        end.clone().add(new THREE.Vector3(0, 0.035, 0))
+      ];
+
+      const lineGeometry = new THREE.BufferGeometry()
+        .setFromPoints(points);
+
+      const line = new THREE.Line(
+        lineGeometry,
+        new THREE.LineBasicMaterial({
+          color: 0x38bdf8,
+          transparent: true,
+          opacity: 0.8
+        })
+      );
+
+      route.add(line);
+      scene.add(route);
+    }
+
+    function renderFrame(_time, frame) {
+      if (frame && session && referenceSpace) {
+        currentHit = null;
+
+        if (hitTestSource) {
+          const results = frame.getHitTestResults(hitTestSource);
+
+          if (results.length > 0) {
+            currentHit = results[0];
+            const pose = currentHit.getPose(referenceSpace);
+
+            if (pose) {
+              reticle.visible = true;
+              reticle.matrix.fromArray(pose.transform.matrix);
+            } else {
+              reticle.visible = false;
+            }
+          } else {
+            reticle.visible = false;
+          }
+        }
+
+        // Update waypoint transforms when native anchors are available.
+        for (const waypoint of waypoints) {
+          if (!waypoint.anchor) continue;
+
+          const pose = frame.getPose(
+            waypoint.anchor.anchorSpace,
+            referenceSpace
+          );
+
+          if (pose) {
+            waypoint.marker.matrix.fromArray(pose.transform.matrix);
+            waypoint.marker.matrix.decompose(
+              waypoint.marker.position,
+              waypoint.marker.quaternion,
+              waypoint.marker.scale
+            );
+          }
+        }
+
+        // Keep the route connected if anchors adjust waypoint positions.
+        if (route && waypoints.length === 2) {
+          updateRoutePositions();
+        }
+      }
+
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }
+
+    function updateRoutePositions() {
+      const start = waypoints[0].marker.position;
+      const end = waypoints[1].marker.position;
+      const horizontal = new THREE.Vector3(
+        end.x - start.x, 0, end.z - start.z
+      );
+
+      if (horizontal.length() < 0.05) return;
+
+      const direction = horizontal.clone().normalize();
+      const arrows = route.children.filter(
+        object => object.isMesh
+      );
+
+      // The final Mesh is the line-independent arrow group.
+      // Reposition the arrows using their original spacing.
+      const count = arrows.length;
+
+      arrows.forEach((arrow, i) => {
+        const t = count > 1 ? i / (count - 1) : 0;
+        arrow.position.lerpVectors(start, end, t);
+        arrow.position.y += 0.045;
+        arrow.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          direction
+        );
+      });
+
+      const line = route.children.find(object => object.isLine);
+      if (line) {
+        line.geometry.setFromPoints([
+          start.clone().add(new THREE.Vector3(0, 0.035, 0)),
+          end.clone().add(new THREE.Vector3(0, 0.035, 0))
+        ]);
+      }
+    }
+
+    function resetRoute() {
+      for (const waypoint of waypoints) {
+        scene.remove(waypoint.marker);
+        waypoint.marker.traverse(object => {
+          if (object.geometry) object.geometry.dispose();
+          if (object.material) {
+            const materials = Array.isArray(object.material)
+              ? object.material : [object.material];
+            materials.forEach(material => material.dispose());
+          }
+        });
+
+        if (waypoint.anchor) {
+          waypoint.anchor.delete();
+        }
+      }
+
+      waypoints.length = 0;
+
+      if (route) {
+        scene.remove(route);
+        route.traverse(object => {
+          if (object.geometry) object.geometry.dispose();
+          if (object.material) {
+            const materials = Array.isArray(object.material)
+              ? object.material : [object.material];
+            materials.forEach(material => material.dispose());
+          }
+        });
+        route = null;
+      }
+
+      setStatus(
+        session
+          ? "Scan the floor and tap to place the Door marker."
+          : "Tap Start AR to begin."
+      );
+    }
+
+    async function exitAR() {
+      if (session) await session.end();
+    }
+
+    function onSessionEnd() {
+      if (hitTestSource) {
+        hitTestSource.cancel();
+        hitTestSource = null;
+      }
+
+      session = null;
+      referenceSpace = null;
+      viewerSpace = null;
+      currentHit = null;
+
+      resetRoute();
+
+      if (renderer) {
+        renderer.setAnimationLoop(renderFrame);
+      }
+
+      startBtn.style.display = "";
+      startBtn.disabled = false;
+      resetBtn.disabled = true;
+      exitBtn.disabled = true;
+      crosshair.style.display = "none";
+
+      setStatus("AR session ended. Tap Start AR to begin again.");
+    }
+
+    startBtn.addEventListener("click", startAR);
+    resetBtn.addEventListener("click", resetRoute);
+    exitBtn.addEventListener("click", exitAR);
+
+    window.addEventListener("resize", () => {
+      if (renderer) {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+
+    if (!window.isSecureContext) {
+      setStatus("Use HTTPS or localhost to enable WebXR.");
+    }
+  </script>
+</body>
+</html>
