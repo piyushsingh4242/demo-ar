@@ -1,672 +1,237 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport"
-        content="width=device-width, initial-scale=1, maximum-scale=1,
-                 user-scalable=no" />
-  <title>Aravalli Lifeline AI - AR Navigation</title>
-
-  <style>
-    * { box-sizing: border-box; }
-
-    html, body {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #111827;
-      color: white;
-      font-family: system-ui, sans-serif;
-      touch-action: manipulation;
-    }
-
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-    }
-
-    #ui {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 20px 16px;
-      padding-top: max(20px, env(safe-area-inset-top));
-      padding-bottom: max(20px, env(safe-area-inset-bottom));
-    }
-
-    #top, #bottom {
-      width: 100%;
-      max-width: 520px;
-      margin: 0 auto;
-      pointer-events: auto;
-    }
-
-    #top {
-      padding: 14px;
-      border-radius: 16px;
-      background: rgba(10, 20, 35, .88);
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 17px;
-      margin: 0 0 7px;
-    }
-
-    #status {
-      font-size: 14px;
-      line-height: 1.45;
-      color: #d1d5db;
-    }
-
-    #bottom {
-      display: flex;
-      gap: 10px;
-    }
-
-    button {
-      flex: 1;
-      min-height: 48px;
-      border: 0;
-      border-radius: 12px;
-      font-size: 15px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    #start {
-      background: #22c55e;
-      color: #052e16;
-    }
-
-    #reset {
-      background: #f3f4f6;
-      color: #111827;
-    }
-
-    #exit {
-      background: #374151;
-      color: white;
-    }
-
-    button:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-
-    #hint {
-      font-size: 12px;
-      text-align: center;
-      margin: 0 0 10px;
-      color: white;
-      text-shadow: 0 1px 4px black;
-    }
-
-    #crosshair {
-      position: fixed;
-      left: 50%;
-      top: 50%;
-      width: 24px;
-      height: 24px;
-      transform: translate(-50%, -50%);
-      border: 2px solid white;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #000;
-      pointer-events: none;
-      display: none;
-    }
-
-    #crosshair::after {
-      content: "";
-      position: absolute;
-      width: 5px;
-      height: 5px;
-      background: #22c55e;
-      border-radius: 50%;
-      top: 7.5px;
-      left: 7.5px;
-    }
-  </style>
-
-  <script type="importmap">
-    {
-      "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
-      }
-    }
-  </script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10221f">
+<title>Aravalli Lifeline AI — Camera AR Demo</title>
+<style>
+  :root{color-scheme:dark;--green:#28d17c;--blue:#42c9ff;--orange:#ffb454}
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101815;color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+  #stage{position:fixed;inset:0;background:#101815;overflow:hidden}
+  #camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+  #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,15,12,.78),transparent 28%,transparent 58%,rgba(5,15,12,.75));pointer-events:none}
+  header{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;z-index:3;padding:12px 14px;background:rgba(10,28,22,.82);border:1px solid rgba(255,255,255,.14);border-radius:16px;backdrop-filter:blur(8px)}
+  h1{font-size:17px;margin:0 0 4px} #status{font-size:13px;line-height:1.4;color:#d7e8df}
+  #cameraFallback{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:32px;color:#d7e8df;gap:10px}
+  #cameraFallback strong{font-size:21px}
+  #cameraFallback p{font-size:14px;line-height:1.5;max-width:340px;margin:0 auto}
+  #controls{position:absolute;z-index:3;bottom:calc(12px + env(safe-area-inset-bottom));left:12px;right:12px;display:grid;gap:9px;max-width:600px;margin:auto}
+  .row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  button{border:1px solid rgba(255,255,255,.2);border-radius:12px;min-height:46px;padding:10px 8px;background:rgba(15,35,28,.94);color:white;font:600 13px system-ui;cursor:pointer;touch-action:manipulation}
+  button.primary{background:#1c9b5d;border-color:#1c9b5d;color:#fff}
+  button.selected{outline:2px solid #fff;outline-offset:1px}
+  button:disabled{opacity:.48}
+  #metrics{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(10,28,22,.86);font-size:12px;color:#e4f5ec}
+  #metrics strong{color:#fff}
+  #permissionNote{font-size:11px;text-align:center;color:#e2eee7;text-shadow:0 1px 4px #000}
+  #fileWarning{display:none;padding:12px;border-radius:12px;background:#6e3814;color:#fff;font-size:13px}
+  @media(min-width:700px){#controls{left:auto;width:380px}header{max-width:500px;right:auto;width:calc(100% - 24px)}}
+</style>
 </head>
-
 <body>
-  <div id="ui">
-    <div id="top">
-      <h1>Aravalli Lifeline AI</h1>
-      <div id="status">Tap Start AR to begin.</div>
+<div id="stage">
+  <video id="camera" autoplay playsinline muted></video>
+  <div id="cameraFallback"><strong>Aravalli Lifeline AI</strong><p>Start the camera to begin the camera-overlay navigation demo. Camera access requires HTTPS or localhost.</p></div>
+  <canvas id="overlay"></canvas>
+  <div id="shade"></div>
+  <header><h1>🧭 Aravalli Lifeline AI</h1><div id="status" role="status" aria-live="polite">Camera overlay demo · Tap Start Camera, then place Door and Bed on the screen.</div></header>
+  <div id="controls">
+    <div id="metrics"><span>Route: <strong id="routeState">Not set</strong></span><span>Screen path: <strong id="distance">—</strong></span></div>
+    <div class="row">
+      <button id="start" class="primary">Start Camera</button>
+      <button id="doorBtn" disabled class="selected">① Place Door</button>
+      <button id="bedBtn" disabled>② Place Bed</button>
     </div>
-
-    <div id="bottom">
-      <button id="start">Start AR</button>
-      <button id="reset" disabled>Reset</button>
-      <button id="exit" disabled>Exit</button>
+    <div class="row">
+      <button id="routeBtn" disabled>Draw Route</button>
+      <button id="resetBtn">Reset Points</button>
+      <button id="stopBtn" disabled>Stop Camera</button>
     </div>
+    <div id="fileWarning">Camera access was blocked. Open this page through HTTPS (GitHub Pages/ngrok) or localhost, then allow camera permission.</div>
+    <div id="permissionNote">Demo overlay only — markers are screen-positioned, not anchored to the real floor.</div>
   </div>
+</div>
+<script>
+(() => {
+  const video = document.getElementById('camera');
+  const canvas = document.getElementById('overlay');
+  const ctx = canvas.getContext('2d');
+  const status = document.getElementById('status');
+  const fallback = document.getElementById('cameraFallback');
+  const fileWarning = document.getElementById('fileWarning');
+  const startBtn = document.getElementById('start');
+  const doorBtn = document.getElementById('doorBtn');
+  const bedBtn = document.getElementById('bedBtn');
+  const routeBtn = document.getElementById('routeBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const routeState = document.getElementById('routeState');
+  const distance = document.getElementById('distance');
+  let stream = null;
+  let activeTool = 'door';
+  let door = null;
+  let bed = null;
+  let routeVisible = true;
+  let animationId = null;
 
-  <div id="crosshair"></div>
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(innerWidth * dpr);
+    canvas.height = Math.round(innerHeight * dpr);
+    canvas.style.width = innerWidth + 'px';
+    canvas.style.height = innerHeight + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
 
-  <script type="module">
-    import * as THREE from "three";
+  function setStatus(text) { status.textContent = text; }
+  function updateUI() {
+    doorBtn.classList.toggle('selected', activeTool === 'door');
+    bedBtn.classList.toggle('selected', activeTool === 'bed');
+    doorBtn.disabled = !stream;
+    bedBtn.disabled = !stream;
+    routeBtn.disabled = !(door && bed);
+    stopBtn.disabled = !stream;
+    routeState.textContent = door && bed ? 'Ready' : door ? 'Door placed' : 'Not set';
+    if (door && bed) {
+      const px = Math.hypot(bed.x-door.x, bed.y-door.y);
+      distance.textContent = Math.round(px) + ' px';
+    } else distance.textContent = '—';
+  }
 
-    const statusEl = document.getElementById("status");
-    const startBtn = document.getElementById("start");
-    const resetBtn = document.getElementById("reset");
-    const exitBtn = document.getElementById("exit");
-    const crosshair = document.getElementById("crosshair");
-
-    let renderer, scene, camera;
-    let session = null;
-    let referenceSpace = null;
-    let viewerSpace = null;
-    let hitTestSource = null;
-    let currentHit = null;
-    let reticle = null;
-    let route = null;
-
-    // Each waypoint can use a native XRAnchor, if supported.
-    const waypoints = [];
-
-    let busy = false;
-
-    function setStatus(message) {
-      statusEl.textContent = message;
+  async function startCamera() {
+    fileWarning.style.display = 'none';
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      fileWarning.style.display = 'block';
+      setStatus('This browser does not provide camera access. Open via HTTPS or localhost.');
+      return;
     }
-
-    function makeRenderer() {
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera();
-
-      renderer = new THREE.WebGLRenderer({
-        alpha: true,
-        antialias: true,
-        powerPreference: "high-performance"
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
       });
-
-      renderer.setPixelRatio(
-        Math.min(window.devicePixelRatio || 1, 2)
-      );
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.xr.enabled = true;
-      renderer.xr.setReferenceSpaceType("local");
-
-      // The real-world camera background is provided by WebXR.
-      renderer.setClearColor(0x000000, 0);
-
-      document.body.insertBefore(
-        renderer.domElement,
-        document.getElementById("ui")
-      );
-
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x64748b, 2));
-
-      reticle = new THREE.Mesh(
-        new THREE.RingGeometry(0.07, 0.10, 32),
-        new THREE.MeshBasicMaterial({
-          color: 0x22c55e,
-          side: THREE.DoubleSide
-        })
-      );
-
-      reticle.rotation.x = -Math.PI / 2;
-      reticle.matrixAutoUpdate = false;
-      reticle.visible = false;
-      scene.add(reticle);
-
-      renderer.setAnimationLoop(renderFrame);
-    }
-
-    function makeMarker(color, label) {
-      const group = new THREE.Group();
-
-      const material = new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 0.35,
-        roughness: 0.45
-      });
-
-      // Small cylinder sits on the detected surface.
-      const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.10, 0.10, 0.035, 24),
-        material
-      );
-      base.position.y = 0.025;
-      group.add(base);
-
-      // Upright pin.
-      const pin = new THREE.Mesh(
-        new THREE.ConeGeometry(0.055, 0.18, 20),
-        material
-      );
-      pin.position.y = 0.13;
-      group.add(pin);
-
-      // Floating label, using a canvas texture.
-      const canvas = document.createElement("canvas");
-      canvas.width = 256;
-      canvas.height = 80;
-
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "rgba(10,20,35,0.9)";
-      ctx.fillRect(0, 0, 256, 80);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 32px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, 128, 40);
-
-      const texture = new THREE.CanvasTexture(canvas);
-      const sprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({
-          map: texture,
-          transparent: true,
-          depthTest: false
-        })
-      );
-
-      sprite.scale.set(0.42, 0.13, 1);
-      sprite.position.y = 0.34;
-      group.add(sprite);
-
-      scene.add(group);
-      return group;
-    }
-
-    async function startAR() {
-      if (busy || session) return;
-      busy = true;
+      video.srcObject = stream;
+      await video.play();
+      video.style.display = 'block';
+      fallback.style.display = 'none';
       startBtn.disabled = true;
-
-      try {
-        if (!navigator.xr) {
-          throw new Error(
-            "WebXR is unavailable. Open this page in a supported " +
-            "Android Chrome browser using HTTPS."
-          );
-        }
-
-        const supported =
-          await navigator.xr.isSessionSupported("immersive-ar");
-
-        if (!supported) {
-          throw new Error(
-            "Immersive AR is not supported on this device/browser."
-          );
-        }
-
-        if (!renderer) makeRenderer();
-
-        // Call requestSession directly from the button action.
-        session = await navigator.xr.requestSession("immersive-ar", {
-          requiredFeatures: ["local", "hit-test"],
-          optionalFeatures: ["anchors", "dom-overlay"],
-          domOverlay: { root: document.getElementById("ui") }
-        });
-
-        renderer.xr.setSession(session);
-
-        referenceSpace = await session.requestReferenceSpace("local");
-        viewerSpace = await session.requestReferenceSpace("viewer");
-
-        hitTestSource =
-          await session.requestHitTestSource({
-            space: viewerSpace
-          });
-
-        session.addEventListener("select", onSelect);
-        session.addEventListener("end", onSessionEnd);
-
-        startBtn.style.display = "none";
-        resetBtn.disabled = false;
-        exitBtn.disabled = false;
-        crosshair.style.display = "block";
-
-        setStatus(
-          "Move your phone slowly to find the floor. " +
-          "Tap to place the Door marker."
-        );
-      } catch (error) {
-        console.error("AR startup failed:", error);
-        setStatus(error.message || "Could not start AR.");
-        startBtn.disabled = false;
-        session = null;
-      } finally {
-        busy = false;
-      }
+      setStatus('Camera ready. Aim at the room, then tap Place Door and tap the screen where the Door should appear.');
+      updateUI();
+      drawLoop();
+    } catch (err) {
+      console.error(err);
+      stream = null;
+      fileWarning.style.display = 'block';
+      setStatus('Camera could not start: ' + (err.message || err.name) + '. Check permission and use HTTPS.');
+      updateUI();
     }
+  }
 
-    function onSelect() {
-      if (!session || !currentHit) {
-        setStatus("No surface detected yet. Scan the floor.");
-        return;
+  function stopCamera() {
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.pause(); video.srcObject = null; video.style.display = 'none';
+    fallback.style.display = 'grid';
+    if (animationId) cancelAnimationFrame(animationId);
+    animationId = null;
+    startBtn.disabled = false;
+    setStatus('Camera stopped. Start it again to continue.');
+    updateUI(); draw();
+  }
+
+  function drawLoop() { draw(); animationId = requestAnimationFrame(drawLoop); }
+
+  function roundedRect(x,y,w,h,r,fill) {
+    ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fillStyle=fill; ctx.fill();
+  }
+
+  function drawMarker(point, label, color) {
+    if (!point) return;
+    const x = point.x, y = point.y;
+    // Layered pin gives a 3D-like appearance but is not a tracked 3D object.
+    ctx.save();
+    ctx.globalAlpha = .25; ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(x,y+17,20,7,0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.shadowColor = color; ctx.shadowBlur = 18;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x,y-5,13,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x-9,y+4); ctx.lineTo(x+9,y+4); ctx.lineTo(x,y+21); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#092016'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label === 'DOOR' ? 'D' : 'B',x,y-5);
+    const w = label.length * 9 + 22;
+    roundedRect(x-w/2,y-47,w,25,8,'rgba(7,24,17,.92)');
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText(label,x,y-34);
+    ctx.restore();
+  }
+
+  function drawArrow(x,y,angle,scale=1) {
+    ctx.save(); ctx.translate(x,y); ctx.rotate(angle); ctx.scale(scale,scale);
+    ctx.shadowColor = '#42c9ff'; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#42c9ff';
+    ctx.beginPath(); ctx.moveTo(0,-17); ctx.lineTo(12,1); ctx.lineTo(5,1); ctx.lineTo(5,13); ctx.lineTo(-5,13); ctx.lineTo(-5,1); ctx.lineTo(-12,1); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+  }
+
+  function draw() {
+    const w = innerWidth, h = innerHeight;
+    ctx.clearRect(0,0,w,h);
+    if (door && bed && routeVisible) {
+      const dx = bed.x-door.x, dy = bed.y-door.y;
+      const len = Math.hypot(dx,dy);
+      const angle = Math.atan2(dy,dx) + Math.PI/2;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(66,201,255,.88)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.setLineDash([10,9]); ctx.beginPath(); ctx.moveTo(door.x,door.y+13); ctx.lineTo(bed.x,bed.y+13); ctx.stroke(); ctx.setLineDash([]);
+      const n = Math.max(1,Math.min(8,Math.floor(len/65)));
+      for (let i=1;i<=n;i++) {
+        const t=i/(n+1);
+        drawArrow(door.x+dx*t,door.y+dy*t,angle,.75+(.25*t));
       }
-
-      if (waypoints.length >= 2) {
-        setStatus("Route ready. Press Reset to place new points.");
-        return;
-      }
-
-      // Snapshot the hit-test pose when the user taps.
-      const pose = currentHit.getPose(referenceSpace);
-
-      if (!pose) {
-        setStatus("Surface pose unavailable. Try again.");
-        return;
-      }
-
-      const isDoor = waypoints.length === 0;
-      const label = isDoor ? "DOOR" : "BED";
-      const color = isDoor ? 0x22c55e : 0xf97316;
-
-      const marker = makeMarker(color, label);
-      marker.matrixAutoUpdate = false;
-      marker.matrix.fromArray(pose.transform.matrix);
-      marker.matrix.decompose(
-        marker.position,
-        marker.quaternion,
-        marker.scale
-      );
-
-      const waypoint = {
-        marker,
-        anchor: null,
-        fallbackPosition: marker.position.clone(),
-        fallbackQuaternion: marker.quaternion.clone()
-      };
-
-      waypoints.push(waypoint);
-
-      // Native anchors are optional and not supported everywhere.
-      // Keep the saved hit-test pose as a fallback.
-      if (typeof currentHit.createAnchor === "function") {
-        currentHit.createAnchor()
-          .then(anchor => {
-            waypoint.anchor = anchor;
-          })
-          .catch(error => {
-            console.warn("Native anchor unavailable:", error);
-          });
-      }
-
-      if (waypoints.length === 1) {
-        setStatus(
-          "Door placed. Point the reticle at the bed's floor " +
-          "position and tap again."
-        );
-      } else {
-        createRoute();
-        setStatus(
-          "Route created! Follow the floor arrows from DOOR to BED."
-        );
-      }
+      ctx.restore();
     }
-
-    function createRoute() {
-      if (route) {
-        scene.remove(route);
-        route.traverse(object => {
-          if (object.geometry) object.geometry.dispose();
-          if (object.material) {
-            const materials = Array.isArray(object.material)
-              ? object.material
-              : [object.material];
-            materials.forEach(material => material.dispose());
-          }
-        });
-      }
-
-      route = new THREE.Group();
-
-      const start = waypoints[0].marker.position;
-      const end = waypoints[1].marker.position;
-
-      const horizontal = new THREE.Vector3(
-        end.x - start.x, 0, end.z - start.z
-      );
-      const distance = horizontal.length();
-
-      if (distance < 0.05) {
-        setStatus("The points are too close. Reset and try again.");
-        return;
-      }
-
-      // A segmented route of arrows on the floor.
-      const count = Math.max(2, Math.floor(distance / 0.35));
-      const direction = horizontal.normalize();
-
-      for (let i = 0; i <= count; i++) {
-        const t = i / count;
-        const position = new THREE.Vector3().lerpVectors(
-          start, end, t
-        );
-
-        // Small lift avoids z-fighting with the floor.
-        position.y += 0.045;
-
-        const arrow = new THREE.Mesh(
-          new THREE.ConeGeometry(0.045, 0.16, 12),
-          new THREE.MeshBasicMaterial({
-            color: 0x38bdf8,
-            depthTest: true
-          })
-        );
-
-        arrow.position.copy(position);
-        arrow.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          direction
-        );
-
-        route.add(arrow);
-      }
-
-      // Add a thin line for continuity between the arrows.
-      const points = [
-        start.clone().add(new THREE.Vector3(0, 0.035, 0)),
-        end.clone().add(new THREE.Vector3(0, 0.035, 0))
-      ];
-
-      const lineGeometry = new THREE.BufferGeometry()
-        .setFromPoints(points);
-
-      const line = new THREE.Line(
-        lineGeometry,
-        new THREE.LineBasicMaterial({
-          color: 0x38bdf8,
-          transparent: true,
-          opacity: 0.8
-        })
-      );
-
-      route.add(line);
-      scene.add(route);
+    drawMarker(door,'DOOR','#28d17c');
+    drawMarker(bed,'BED','#ffb454');
+    if (stream && !door && !bed) {
+      ctx.save(); ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(w/2,h/2,13,0,Math.PI*2); ctx.moveTo(w/2-21,h/2);ctx.lineTo(w/2-7,h/2);ctx.moveTo(w/2+7,h/2);ctx.lineTo(w/2+21,h/2);ctx.moveTo(w/2,h/2-21);ctx.lineTo(w/2,h/2-7);ctx.moveTo(w/2,h/2+7);ctx.lineTo(w/2,h/2+21);ctx.stroke();ctx.restore();
     }
+  }
 
-    function renderFrame(_time, frame) {
-      if (frame && session && referenceSpace) {
-        currentHit = null;
+  function pointFromEvent(event) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: Math.max(12,Math.min(innerWidth-12,event.clientX-rect.left)), y: Math.max(90,Math.min(innerHeight-115,event.clientY-rect.top)) };
+  }
 
-        if (hitTestSource) {
-          const results = frame.getHitTestResults(hitTestSource);
-
-          if (results.length > 0) {
-            currentHit = results[0];
-            const pose = currentHit.getPose(referenceSpace);
-
-            if (pose) {
-              reticle.visible = true;
-              reticle.matrix.fromArray(pose.transform.matrix);
-            } else {
-              reticle.visible = false;
-            }
-          } else {
-            reticle.visible = false;
-          }
-        }
-
-        // Update waypoint transforms when native anchors are available.
-        for (const waypoint of waypoints) {
-          if (!waypoint.anchor) continue;
-
-          const pose = frame.getPose(
-            waypoint.anchor.anchorSpace,
-            referenceSpace
-          );
-
-          if (pose) {
-            waypoint.marker.matrix.fromArray(pose.transform.matrix);
-            waypoint.marker.matrix.decompose(
-              waypoint.marker.position,
-              waypoint.marker.quaternion,
-              waypoint.marker.scale
-            );
-          }
-        }
-
-        // Keep the route connected if anchors adjust waypoint positions.
-        if (route && waypoints.length === 2) {
-          updateRoutePositions();
-        }
-      }
-
-      if (renderer && scene && camera) {
-        renderer.render(scene, camera);
-      }
+  canvas.addEventListener('pointerdown', event => {
+    if (!stream) return;
+    const point = pointFromEvent(event);
+    if (activeTool === 'door') {
+      door = point; routeVisible = true;
+      activeTool = bed ? 'bed' : 'bed';
+      setStatus('Door marker placed on the screen. Now choose Place Bed and tap its screen position.');
+    } else {
+      bed = point; routeVisible = true;
+      setStatus('Bed marker placed. The demo route is shown between the two screen points.');
     }
+    updateUI(); draw();
+  });
 
-    function updateRoutePositions() {
-      const start = waypoints[0].marker.position;
-      const end = waypoints[1].marker.position;
-      const horizontal = new THREE.Vector3(
-        end.x - start.x, 0, end.z - start.z
-      );
-
-      if (horizontal.length() < 0.05) return;
-
-      const direction = horizontal.clone().normalize();
-      const arrows = route.children.filter(
-        object => object.isMesh
-      );
-
-      // The final Mesh is the line-independent arrow group.
-      // Reposition the arrows using their original spacing.
-      const count = arrows.length;
-
-      arrows.forEach((arrow, i) => {
-        const t = count > 1 ? i / (count - 1) : 0;
-        arrow.position.lerpVectors(start, end, t);
-        arrow.position.y += 0.045;
-        arrow.quaternion.setFromUnitVectors(
-          new THREE.Vector3(0, 1, 0),
-          direction
-        );
-      });
-
-      const line = route.children.find(object => object.isLine);
-      if (line) {
-        line.geometry.setFromPoints([
-          start.clone().add(new THREE.Vector3(0, 0.035, 0)),
-          end.clone().add(new THREE.Vector3(0, 0.035, 0))
-        ]);
-      }
-    }
-
-    function resetRoute() {
-      for (const waypoint of waypoints) {
-        scene.remove(waypoint.marker);
-        waypoint.marker.traverse(object => {
-          if (object.geometry) object.geometry.dispose();
-          if (object.material) {
-            const materials = Array.isArray(object.material)
-              ? object.material : [object.material];
-            materials.forEach(material => material.dispose());
-          }
-        });
-
-        if (waypoint.anchor) {
-          waypoint.anchor.delete();
-        }
-      }
-
-      waypoints.length = 0;
-
-      if (route) {
-        scene.remove(route);
-        route.traverse(object => {
-          if (object.geometry) object.geometry.dispose();
-          if (object.material) {
-            const materials = Array.isArray(object.material)
-              ? object.material : [object.material];
-            materials.forEach(material => material.dispose());
-          }
-        });
-        route = null;
-      }
-
-      setStatus(
-        session
-          ? "Scan the floor and tap to place the Door marker."
-          : "Tap Start AR to begin."
-      );
-    }
-
-    async function exitAR() {
-      if (session) await session.end();
-    }
-
-    function onSessionEnd() {
-      if (hitTestSource) {
-        hitTestSource.cancel();
-        hitTestSource = null;
-      }
-
-      session = null;
-      referenceSpace = null;
-      viewerSpace = null;
-      currentHit = null;
-
-      resetRoute();
-
-      if (renderer) {
-        renderer.setAnimationLoop(renderFrame);
-      }
-
-      startBtn.style.display = "";
-      startBtn.disabled = false;
-      resetBtn.disabled = true;
-      exitBtn.disabled = true;
-      crosshair.style.display = "none";
-
-      setStatus("AR session ended. Tap Start AR to begin again.");
-    }
-
-    startBtn.addEventListener("click", startAR);
-    resetBtn.addEventListener("click", resetRoute);
-    exitBtn.addEventListener("click", exitAR);
-
-    window.addEventListener("resize", () => {
-      if (renderer) {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      }
-    });
-
-    if (!window.isSecureContext) {
-      setStatus("Use HTTPS or localhost to enable WebXR.");
-    }
-  </script>
+  startBtn.addEventListener('click', startCamera);
+  stopBtn.addEventListener('click', stopCamera);
+  doorBtn.addEventListener('click', () => { activeTool='door'; setStatus('Tap the camera view to position the Door marker.'); updateUI(); });
+  bedBtn.addEventListener('click', () => { activeTool='bed'; setStatus('Tap the camera view to position the Bed marker.'); updateUI(); });
+  routeBtn.addEventListener('click', () => { routeVisible=true; draw(); setStatus('Route displayed. These arrows are a visual overlay, not floor-anchored guidance.'); });
+  resetBtn.addEventListener('click', () => { door=null; bed=null; routeVisible=true; activeTool='door'; updateUI(); draw(); setStatus(stream ? 'Reset complete. Tap Place Door and choose its screen position.' : 'Points cleared. Start the camera to begin.'); });
+  window.addEventListener('resize', resize);
+  window.addEventListener('pagehide', () => { if (stream) stream.getTracks().forEach(track => track.stop()); });
+  resize(); updateUI();
+})();
+</script>
 </body>
 </html>
