@@ -1,59 +1,291 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aravalli Lifeline AI — Live Location</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aravalli Lifeline AI | Live map and hospital navigator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:#f4f7fb;color:#172033}
-header{padding:18px;background:white;border-bottom:1px solid #ddd}.wrap,main{max-width:950px;margin:auto}h1{font-size:1.5rem;margin:0 0 5px}.sub,.note{color:#5f6b7a}
-main{padding:14px}.controls{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:10px}
-button{padding:12px 15px;border:0;border-radius:11px;font-size:1rem;font-weight:700;cursor:pointer}
-#start{background:#1769ff;color:white}#stop{background:#e5eaf1;color:#172033}#status{width:100%;min-height:1.4em;color:#5f6b7a}
-#map{height:58vh;min-height:320px;border:1px solid #d9e1ec;border-radius:14px;overflow:hidden}
-.info{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:10px}.tile{padding:12px;background:white;border:1px solid #e2e8f0;border-radius:12px;overflow-wrap:anywhere}
-.label{font-size:.8rem;color:#5f6b7a;margin-bottom:5px}.value{font-weight:700}.note{font-size:.87rem;line-height:1.5}
-.dot{width:18px;height:18px;border-radius:50%;background:#1677ff;border:3px solid white;box-shadow:0 0 0 7px #1677ff30,0 1px 5px #64748b}
-@media(max-width:560px){.info{grid-template-columns:1fr}#map{height:55vh}}
-</style></head>
+:root{--ink:#12201f;--paper:#f5f7f4;--teal:#0a5c5a;--teal2:#0f7f7b;--red:#cf3b3b;--amber:#d99a1e;--green:#2e8b57;--line:#d3ddda;--card:#fff}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 "Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:var(--ink);background:var(--paper)}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;padding:12px 20px;background:var(--teal);color:#fff}
+header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.2px}
+header h1 small{display:block;font-size:13px;font-weight:400;opacity:.8}
+nav{display:flex;gap:6px;margin-left:auto}
+nav button{border:0;border-radius:8px;padding:9px 14px;font:inherit;font-weight:600;color:#fff;background:transparent;cursor:pointer}
+nav button[aria-selected=true]{background:#fff;color:var(--teal)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #f2b33d;outline-offset:2px}
+section{padding:16px 20px;max-width:1240px;margin:0 auto}
+section[hidden]{display:none}
+.split{display:grid;grid-template-columns:340px 1fr;gap:16px}
+@media(max-width:820px){.split{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h2{margin:0 0 8px;font-size:17px}
+.row{display:flex;gap:8px}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:#fff}
+.btn{border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;color:#fff;background:var(--teal2);cursor:pointer;white-space:nowrap}
+.btn.alt{background:#fff;color:var(--teal);border:1px solid var(--teal)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{border:1px solid var(--line);background:#fff;border-radius:99px;padding:4px 12px;font:inherit;font-size:14px;cursor:pointer}
+.note{font-size:13px;color:#52615f;margin:6px 0}
+#list{list-style:none;margin:10px 0 0;padding:0;max-height:46vh;overflow:auto}
+#list button{width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;padding:10px 4px;font:inherit;cursor:pointer}
+#list b{display:block}
+.tag{font-size:12px;font-weight:700;border-radius:6px;padding:1px 7px;color:#fff}
+.tag.ok{background:var(--green)}.tag.low{background:var(--amber)}
+#map{height:68vh;min-height:420px;border-radius:12px;border:1px solid var(--line)}
+.pin{display:block;width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+.pin.base{background:var(--teal2)}.pin.ok{background:var(--green)}.pin.low{background:var(--amber)}
+.ctl{display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:end;margin-bottom:12px}
+@media(max-width:620px){.ctl{grid-template-columns:1fr 1fr}}
+.ctl label{font-size:13px;font-weight:600;display:block}
+#plan{width:100%;height:auto;max-height:72vh;background:#fff;border:1px solid var(--line);border-radius:12px;touch-action:none;cursor:grab}
+#rt{fill:none;stroke:var(--red);stroke-width:6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:12 10;animation:flow 1s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-22}}
+@media(prefers-reduced-motion:reduce){#rt{animation:none}}
+.room{cursor:pointer}.room:hover rect{stroke:var(--teal);stroke-width:3}
+.zoom{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center}
+.cam{position:relative;background:#0d1615;border-radius:12px;min-height:300px;overflow:hidden}
+.cam video{width:100%;max-height:60vh;display:block;object-fit:cover}
+.cam .hint{position:absolute;inset:auto 0 0 0;padding:10px;text-align:center;color:#fff;background:rgba(0,0,0,.45);font-size:14px}
+#card{margin-top:12px;display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:start}
+#card[hidden]{display:none}
+#card img{width:100%;border-radius:10px;border:1px solid var(--line)}
+@media(max-width:560px){#card{grid-template-columns:1fr}}
+</style>
+</head>
 <body>
-<header><div class="wrap"><h1>Aravalli Lifeline AI</h1><div class="sub">Free 2D map with live GPS location</div></div></header>
-<main>
-<div class="controls"><button id="start">📍 Use My Live Location</button><button id="stop" disabled>Stop tracking</button><div id="status" role="status">Tap “Use My Live Location” and allow location access.</div></div>
-<div id="map"></div>
-<div class="info">
-<div class="tile"><div class="label">Latitude</div><div class="value" id="lat">—</div></div>
-<div class="tile"><div class="label">Longitude</div><div class="value" id="lon">—</div></div>
-<div class="tile"><div class="label">GPS accuracy</div><div class="value" id="accuracy">—</div></div>
-</div>
-<p class="note">Map data © OpenStreetMap contributors. Coordinates are handled in this browser and are not sent to a custom server. GPS can be inaccurate indoors; this is a GPS test, not precise indoor navigation. Use HTTPS (such as GitHub Pages) or localhost.</p>
-</main>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<header>
+  <h1>Aravalli Lifeline AI<small>Live map, medicine finder and hospital navigator (demo data)</small></h1>
+  <nav role="tablist" aria-label="Dashboard sections">
+    <button role="tab" id="t-map" aria-selected="true">Live map</button>
+    <button role="tab" id="t-indoor" aria-selected="false">Hospital map</button>
+    <button role="tab" id="t-ar" aria-selected="false">AR navigation</button>
+  </nav>
+</header>
+
+<section id="tab-map">
+  <div class="split">
+    <aside class="panel">
+      <h2>Search medicine</h2>
+      <form class="row" id="sform">
+        <input id="q" list="medlist" placeholder="Type a medicine, e.g. paracetamol" aria-label="Medicine name" autocomplete="off">
+        <datalist id="medlist"></datalist>
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <div class="chips" id="chips"></div>
+      <p class="note" id="locnote">Finding your live location...</p>
+      <p class="note">Store names, stock and phone numbers are dummy data placed around you.</p>
+      <ul id="list"></ul>
+    </aside>
+    <div id="map" aria-label="Map with nearby medical stores"></div>
+  </div>
+</section>
+
+<section id="tab-indoor" hidden>
+  <div class="panel">
+    <div class="ctl">
+      <div><label for="from">Start</label><select id="from"></select></div>
+      <div><label for="to">Destination</label><select id="to"></select></div>
+      <button class="btn alt" id="swap" type="button">Swap</button>
+      <button class="btn" id="go" type="button">Show route</button>
+    </div>
+    <p class="note" id="sum" aria-live="polite"></p>
+    <svg id="plan" viewBox="0 0 800 540" role="img" aria-label="Hospital floor plan"></svg>
+    <div class="zoom">
+      <button class="btn alt" id="zi" type="button">Zoom in</button>
+      <button class="btn alt" id="zo" type="button">Zoom out</button>
+      <button class="btn alt" id="zr" type="button">Reset view</button>
+      <span class="note">Drag to move, scroll to zoom, tap a room to set it as destination.</span>
+    </div>
+  </div>
+</section>
+
+<section id="tab-ar" hidden>
+  <div class="panel">
+    <h2>Scan a marker</h2>
+    <div class="row" style="flex-wrap:wrap">
+      <button class="btn" id="camBtn" type="button">Start camera</button>
+      <span class="note" style="align-self:center">Point at a QR marker with text like AR:w13. Or tap a sample marker:</span>
+    </div>
+    <div class="chips" id="mk"></div>
+    <div class="cam"><video id="cam" playsinline muted></video><div class="hint" id="camNote">Camera is off.</div></div>
+    <div class="panel" id="card" hidden>
+      <img id="cimg" alt="Marker information">
+      <div><h2 id="ctitle"></h2><p id="ctxt"></p><button class="btn" id="cgo" type="button">Navigate from here</button></div>
+    </div>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-const map=L.map('map').setView([20.5937,78.9629],5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}).addTo(map);
-let watchId=null,marker=null,circle=null,firstFix=true;
-const statusEl=document.getElementById('status'),startBtn=document.getElementById('start'),stopBtn=document.getElementById('stop');
-function startTracking(){
- if(!navigator.geolocation){statusEl.textContent='Geolocation is not supported by this browser.';return}
- if(!window.isSecureContext){statusEl.textContent='Location requires HTTPS or localhost. Deploy this page to GitHub Pages or run on localhost.';return}
- if(watchId!==null)return;
- firstFix=true;statusEl.textContent='Requesting location… allow the permission prompt if it appears.';startBtn.disabled=true;stopBtn.disabled=false;
- watchId=navigator.geolocation.watchPosition(pos=>{
-  const c=pos.coords,p=[c.latitude,c.longitude];
-  document.getElementById('lat').textContent=c.latitude.toFixed(6);
-  document.getElementById('lon').textContent=c.longitude.toFixed(6);
-  document.getElementById('accuracy').textContent='± '+Math.round(c.accuracy)+' metres';
-  if(!marker){const icon=L.divIcon({className:'',html:'<div class="dot"></div>',iconSize:[18,18],iconAnchor:[9,9]});marker=L.marker(p,{icon}).addTo(map).bindPopup('Your current GPS location');circle=L.circle(p,{radius:c.accuracy,color:'#1677ff',weight:1,fillColor:'#1677ff',fillOpacity:.1}).addTo(map)}
-  else{marker.setLatLng(p);circle.setLatLng(p);circle.setRadius(c.accuracy)}
-  if(firstFix){map.setView(p,17);marker.openPopup();firstFix=false}
-  statusEl.textContent='Live location active. Updated '+new Date(pos.timestamp).toLocaleTimeString()+'.';
- },err=>{
-  const m={1:'Location permission denied. Allow Location for this site in Brave settings, then retry.',2:'Phone could not determine location. Turn GPS on and try outdoors.',3:'Location timed out. Try again in an open area.'};
-  statusEl.textContent=m[err.code]||'Could not get location: '+err.message;
-  if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;startBtn.disabled=false;stopBtn.disabled=true;
- },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
+const $=s=>document.querySelector(s);
+const MEDS=[
+ {id:'para',n:'Paracetamol 500 mg',a:['paracetamol','acetaminophen','crocin','dolo','fever','पैरासिटामोल']},
+ {id:'ors',n:'ORS sachet',a:['ors','oral rehydration','electral','ओआरएस']},
+ {id:'cet',n:'Cetirizine 10 mg',a:['cetirizine','cetrizine','allergy']},
+ {id:'ibu',n:'Ibuprofen 400 mg',a:['ibuprofen','brufen','pain']},
+ {id:'anta',n:'Antacid syrup',a:['antacid','digene','gelusil','acidity']},
+ {id:'asv',n:'Anti-snake venom (hospital only)',a:['antivenom','anti venom','asv','snake','saanp','सांप']}
+];
+const DEFS=[
+ {n:'Shree Ji Medical',dx:-250,dy:180,ph:'+91 90000 00001',h:'8 am to 10 pm',inv:{para:42,ors:18,cet:9,ibu:25}},
+ {n:'City Care Pharmacy',dx:380,dy:120,ph:'+91 90000 00002',h:'9 am to 9 pm',inv:{para:6,ors:30,anta:12}},
+ {n:'Lake View Chemist',dx:120,dy:-420,ph:'+91 90000 00003',h:'8 am to 11 pm',inv:{para:0,cet:20,anta:8}},
+ {n:'Aravalli Jan Aushadhi',dx:-520,dy:-160,ph:'+91 90000 00004',h:'9 am to 8 pm',inv:{para:80,ors:60,cet:35,ibu:40,anta:22}},
+ {n:'District Hospital Pharmacy',dx:700,dy:-300,ph:'+91 90000 00005',h:'Open 24 hours',inv:{para:120,ors:40,asv:12,cet:30,ibu:50}},
+ {n:'Sanjeevani Medicos',dx:-80,dy:-760,ph:'+91 90000 00006',h:'8 am to 9 pm',inv:{para:15,anta:6}},
+ {n:'Rajmahal Medical Hall',dx:260,dy:-80,ph:'+91 90000 00007',h:'9 am to 10 pm',inv:{para:9,ors:11}},
+ {n:'Life Pharmacy 24x7',dx:-620,dy:430,ph:'+91 90000 00008',h:'Open 24 hours',inv:{para:33,asv:4,ors:25,ibu:12}}
+];
+let center={lat:24.5854,lng:73.7125},me=[center.lat,center.lng],stores=[],markers=[],userMk=null,curQ='';
+const map=L.map('map').setView(me,15);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+function build(){stores=DEFS.map(d=>({...d,lat:center.lat+d.dy/111320,lng:center.lng+d.dx/(111320*Math.cos(center.lat*Math.PI/180))}))}
+function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);
+ const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const fd=d=>d<1000?Math.round(d)+' m':(d/1000).toFixed(1)+' km';
+function findMed(q){q=q.trim().toLowerCase();if(!q)return null;
+ return MEDS.find(m=>m.n.toLowerCase().includes(q)||m.a.some(a=>a.includes(q)||(q.length>2&&q.includes(a))))||null}
+function render(q){
+ curQ=q;markers.forEach(m=>m.remove());markers=[];
+ const med=findMed(q),ul=$('#list');ul.innerHTML='';
+ let L1=stores.map(s=>({s,d:dist(me,[s.lat,s.lng]),qty:med?(s.inv[med.id]||0):null}));
+ if(med)L1=L1.filter(x=>x.qty>0);
+ L1.sort((a,b)=>a.d-b.d);
+ if(q&&!med){ul.innerHTML='<li class="note">No medicine matched "'+q.replace(/</g,'')+'". Try paracetamol, ORS or antivenom.</li>'}
+ else if(med&&!L1.length){ul.innerHTML='<li class="note">Not in stock at any nearby store.</li>'}
+ else if(med){ul.innerHTML='<li class="note">'+L1.length+' nearby stores have '+med.n+', nearest first.</li>'}
+ L1.forEach(x=>{
+  const cls=med?(x.qty>10?'ok':'low'):'base',s=x.s;
+  const stock=med?(x.qty>10?'In stock ('+x.qty+')':'Low stock ('+x.qty+')'):'';
+  const mk=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:'<span class="pin '+cls+'"></span>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map);
+  mk.bindPopup('<b>'+s.n+'</b><br>'+fd(x.d)+' away<br>'+s.h+'<br>'+s.ph+(stock?'<br><b>'+med.n+': '+stock+'</b>':'')+
+   '<br><a target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination='+s.lat+','+s.lng+'">Get directions</a>');
+  markers.push(mk);
+  const li=document.createElement('li'),b=document.createElement('button');
+  b.innerHTML='<b>'+s.n+'</b>'+fd(x.d)+' away, '+s.h+(stock?' <span class="tag '+cls+'">'+stock+'</span>':'');
+  b.onclick=()=>{map.flyTo([s.lat,s.lng],17);mk.openPopup()};
+  li.appendChild(b);ul.appendChild(li);
+ });
+ if(med&&L1.length){map.fitBounds(L.latLngBounds([me,...L1.slice(0,4).map(x=>[x.s.lat,x.s.lng])]).pad(.3))}
 }
-function stopTracking(){if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;startBtn.disabled=false;stopBtn.disabled=true;statusEl.textContent='Live tracking stopped. Last position remains on the map.'}
-startBtn.addEventListener('click',startTracking);stopBtn.addEventListener('click',stopTracking);
-</script></body></html>
+$('#medlist').innerHTML=MEDS.map(m=>'<option value="'+m.n.split(' ')[0]+'">').join('');
+$('#chips').innerHTML=['Paracetamol','ORS','Antivenom','Cetirizine'].map(t=>'<button type="button" class="chip">'+t+'</button>').join('');
+$('#chips').onclick=e=>{if(e.target.classList.contains('chip')){$('#q').value=e.target.textContent;render(e.target.textContent)}};
+$('#sform').onsubmit=e=>{e.preventDefault();render($('#q').value)};
+build();render('');
+if(navigator.geolocation){
+ navigator.geolocation.watchPosition(p=>{
+  const first=!userMk;me=[p.coords.latitude,p.coords.longitude];
+  if(!userMk){userMk=L.circleMarker(me,{radius:9,color:'#fff',weight:3,fillColor:'#1a73e8',fillOpacity:1}).addTo(map).bindTooltip('You are here')}else userMk.setLatLng(me);
+  if(first){center={lat:me[0],lng:me[1]};build();map.setView(me,15);$('#locnote').textContent='Live location found. Dummy stores are placed around you.';render(curQ)}
+ },()=>{$('#locnote').textContent='Location is blocked, showing a sample area in Udaipur. Allow location to see stores around you.'},{enableHighAccuracy:true,maximumAge:5000});
+}else $('#locnote').textContent='Location is not supported, showing a sample area in Udaipur.';
+
+/* ---------- Hospital floor plan ---------- */
+const ROOMS=[
+ {id:'er',n:'Emergency',x:60,y:40,w:130,h:160,dx:125,top:1,c:'#f6d5d5'},
+ {id:'w12',n:'Ward 12',x:190,y:40,w:190,h:160,dx:285,top:1,c:'#dcebf3'},
+ {id:'icu',n:'ICU',x:420,y:40,w:140,h:160,dx:490,top:1,c:'#f3e3c8'},
+ {id:'w13',n:'Ward 13',x:560,y:40,w:180,h:160,dx:650,top:1,c:'#dcebf3'},
+ {id:'rec',n:'Reception',x:60,y:300,w:130,h:160,dx:125,top:0,c:'#e3ecdc'},
+ {id:'ph',n:'Pharmacy',x:190,y:300,w:190,h:160,dx:285,top:0,c:'#d9efe9'},
+ {id:'caf',n:'Cafeteria',x:420,y:300,w:140,h:160,dx:490,top:0,c:'#f6e6d0'},
+ {id:'lab',n:'Laboratory',x:560,y:300,w:180,h:160,dx:650,top:0,c:'#e6e0f1'}
+];
+const PL=[{id:'main',n:'Main door',node:'main'},...ROOMS.map(r=>({id:r.id,n:r.n,node:'d_'+r.id}))];
+const N={main:[400,500]},G={};
+[125,285,400,490,650].forEach(x=>N['c'+x]=[x,250]);
+ROOMS.forEach(r=>N['d_'+r.id]=[r.dx,r.top?200:300]);
+const E=[['c125','c285'],['c285','c400'],['c400','c490'],['c490','c650'],['c400','main'],...ROOMS.map(r=>['d_'+r.id,'c'+r.dx])];
+E.forEach(([a,b])=>{(G[a]=G[a]||[]).push(b);(G[b]=G[b]||[]).push(a)});
+function route(a,b){
+ const D={},P={},Q=new Set(Object.keys(N));Object.keys(N).forEach(k=>D[k]=1e9);D[a]=0;
+ while(Q.size){let u=null;Q.forEach(k=>{if(u===null||D[k]<D[u])u=k});Q.delete(u);if(u===b)break;
+  (G[u]||[]).forEach(v=>{const w=Math.hypot(N[u][0]-N[v][0],N[u][1]-N[v][1]);if(D[u]+w<D[v]){D[v]=D[u]+w;P[v]=u}})}
+ const path=[];for(let k=b;k;k=P[k]){path.unshift(k);if(k===a)break}
+ return{path,len:D[b]}
+}
+const plan=$('#plan');let vb=[0,0,800,540];
+function setVB(){plan.setAttribute('viewBox',vb.join(' '))}
+function drawPlan(){
+ let s='<rect x="40" y="20" width="720" height="500" rx="10" fill="#f1f4f2" stroke="#9fb0ac" stroke-width="3"/>';
+ s+='<rect x="60" y="200" width="680" height="100" fill="#fff"/><rect x="380" y="300" width="40" height="200" fill="#fff"/>';
+ s+='<text x="400" y="255" text-anchor="middle" font-size="13" fill="#7b8b88">Corridor</text>';
+ ROOMS.forEach(r=>{
+  s+='<g class="room" data-id="'+r.id+'"><rect x="'+r.x+'" y="'+r.y+'" width="'+r.w+'" height="'+r.h+'" fill="'+r.c+'" stroke="#7d8f8b" stroke-width="2"/>'+
+  '<text x="'+(r.x+r.w/2)+'" y="'+(r.y+r.h/2+5)+'" text-anchor="middle" font-size="17" font-weight="600" fill="#12201f">'+r.n+'</text>'+
+  '<rect x="'+(r.dx-16)+'" y="'+(r.top?196:296)+'" width="32" height="8" fill="#fff"/></g>';
+ });
+ s+='<text x="400" y="516" text-anchor="middle" font-size="14" font-weight="700" fill="#0a5c5a">Main door</text>';
+ s+='<g id="routeg"></g>';plan.innerHTML=s;
+}
+function ctr(p){const r=ROOMS.find(x=>x.id===p.id);return r?[r.x+r.w/2,r.y+r.h/2]:null}
+function showRoute(){
+ const A=PL.find(p=>p.id===$('#from').value),B=PL.find(p=>p.id===$('#to').value);
+ if(A.id===B.id){$('#sum').textContent='Start and destination are the same place.';$('#routeg').innerHTML='';return}
+ const r=route(A.node,B.node),pts=r.path.map(k=>N[k]);
+ const a=ctr(A),b=ctr(B);if(a)pts.unshift(a);if(b)pts.push(b);
+ const last=pts[pts.length-1],first=pts[0],m=Math.round(r.len*0.12);
+ $('#routeg').innerHTML='<polyline id="rt" points="'+pts.map(p=>p.join(',')).join(' ')+'"/>'+
+  '<circle cx="'+first[0]+'" cy="'+first[1]+'" r="10" fill="#2e8b57" stroke="#fff" stroke-width="3"/>'+
+  '<circle cx="'+last[0]+'" cy="'+last[1]+'" r="10" fill="#cf3b3b" stroke="#fff" stroke-width="3"/>';
+ $('#sum').textContent=A.n+' to '+B.n+': about '+m+' m, roughly '+Math.max(1,Math.round(m/72))+' min on foot.';
+}
+const opts=PL.map(p=>'<option value="'+p.id+'">'+p.n+'</option>').join('');
+$('#from').innerHTML=opts;$('#to').innerHTML=opts;$('#from').value='main';$('#to').value='w13';
+drawPlan();showRoute();
+$('#go').onclick=showRoute;$('#from').onchange=showRoute;$('#to').onchange=showRoute;
+$('#swap').onclick=()=>{const f=$('#from').value;$('#from').value=$('#to').value;$('#to').value=f;showRoute()};
+plan.addEventListener('click',e=>{const g=e.target.closest('.room');if(g&&!moved){$('#to').value=g.dataset.id;showRoute()}});
+function zoom(f,cx,cy){const nw=Math.min(800,Math.max(200,vb[2]*f)),nh=nw*540/800;
+ vb=[Math.max(0,Math.min(800-nw,cx-(cx-vb[0])*nw/vb[2])),Math.max(0,Math.min(540-nh,cy-(cy-vb[1])*nh/vb[3])),nw,nh];setVB()}
+$('#zi').onclick=()=>zoom(.7,vb[0]+vb[2]/2,vb[1]+vb[3]/2);
+$('#zo').onclick=()=>zoom(1.4,vb[0]+vb[2]/2,vb[1]+vb[3]/2);
+$('#zr').onclick=()=>{vb=[0,0,800,540];setVB()};
+plan.addEventListener('wheel',e=>{e.preventDefault();const r=plan.getBoundingClientRect();
+ zoom(e.deltaY<0?.85:1.18,vb[0]+(e.clientX-r.left)/r.width*vb[2],vb[1]+(e.clientY-r.top)/r.height*vb[3])},{passive:false});
+let drag=null,moved=false;
+plan.addEventListener('pointerdown',e=>{drag=[e.clientX,e.clientY];moved=false});
+window.addEventListener('pointerup',()=>{drag=null});
+plan.addEventListener('pointermove',e=>{if(!drag)return;const r=plan.getBoundingClientRect(),dx=e.clientX-drag[0],dy=e.clientY-drag[1];
+ if(Math.abs(dx)+Math.abs(dy)>3)moved=true;if(!moved)return;
+ vb[0]=Math.max(0,Math.min(800-vb[2],vb[0]-dx*vb[2]/r.width));vb[1]=Math.max(0,Math.min(540-vb[3],vb[1]-dy*vb[3]/r.height));
+ drag=[e.clientX,e.clientY];setVB()});
+
+/* ---------- AR marker scan ---------- */
+/* To use your own picture, set img to a file path in your repo, e.g. img:'assets/ward13.jpg' */
+function ph(t,c){return 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="'+c+'"/><rect x="20" y="20" width="360" height="260" rx="14" fill="none" stroke="#fff" stroke-width="4"/><text x="200" y="160" text-anchor="middle" font-family="Arial" font-size="30" font-weight="700" fill="#fff">'+t+'</text><text x="200" y="200" text-anchor="middle" font-family="Arial" font-size="16" fill="#fff">Sample marker image</text></svg>')}
+const MK=[
+ {id:'main',t:'Main entrance',x:'You are at the main door. Reception is the first room on your left. Emergency is straight ahead and left.',img:ph('Main entrance','#0a5c5a')},
+ {id:'ph',t:'Pharmacy',x:'Pharmacy is open 24 hours. Show your prescription at the counter. The lab is across the corridor.',img:ph('Pharmacy','#2e8b57')},
+ {id:'w13',t:'Ward 13',x:'Ward 13 is the general ward, 12 beds. Visiting hours are 4 pm to 6 pm. Ask the nurse desk for bed numbers.',img:ph('Ward 13','#cf3b3b')}
+];
+$('#mk').innerHTML=MK.map(m=>'<button type="button" class="chip" data-id="'+m.id+'">'+m.t+'</button>').join('');
+$('#mk').onclick=e=>{if(e.target.dataset.id)showMarker(e.target.dataset.id)};
+let cur=null;
+function showMarker(id){const m=MK.find(x=>x.id===id);if(!m)return;cur=m;
+ $('#cimg').src=m.img;$('#ctitle').textContent=m.t;$('#ctxt').textContent=m.x;$('#card').hidden=false}
+$('#cgo').onclick=()=>{if(cur){$('#from').value=cur.id;show('indoor');showRoute()}};
+let stream=null,timer=null;
+$('#camBtn').onclick=async()=>{
+ try{
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+  const v=$('#cam');v.srcObject=stream;await v.play();$('#camNote').textContent='Point the camera at a marker.';
+  if('BarcodeDetector' in window){const bd=new BarcodeDetector({formats:['qr_code']});
+   timer=setInterval(async()=>{try{const r=await bd.detect(v);if(r[0])showMarker(r[0].rawValue.replace(/^AR:/,''))}catch(e){}},500)}
+  else $('#camNote').textContent='This browser cannot read QR codes. Use the sample marker buttons above.';
+ }catch(e){$('#camNote').textContent='Camera unavailable. Allow camera access on a secure (https) page, or use the sample markers.'}
+};
+
+/* ---------- Tabs ---------- */
+function show(t){
+ ['map','indoor','ar'].forEach(k=>{$('#tab-'+k).hidden=k!==t;$('#t-'+k).setAttribute('aria-selected',k===t)});
+ if(t==='map')setTimeout(()=>map.invalidateSize(),50);
+}
+['map','indoor','ar'].forEach(k=>$('#t-'+k).onclick=()=>show(k));
+</script>
+</body>
+</html>
