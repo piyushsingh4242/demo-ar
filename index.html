@@ -1,237 +1,62 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#10221f">
-<title>Aravalli Lifeline AI — Camera AR Demo</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Markerless AR Support Check</title>
 <style>
-  :root{color-scheme:dark;--green:#28d17c;--blue:#42c9ff;--orange:#ffb454}
-  *{box-sizing:border-box}
-  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101815;color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
-  #stage{position:fixed;inset:0;background:#101815;overflow:hidden}
-  #camera{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
-  #overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:auto;touch-action:manipulation}
-  #shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,15,12,.78),transparent 28%,transparent 58%,rgba(5,15,12,.75));pointer-events:none}
-  header{position:absolute;top:calc(12px + env(safe-area-inset-top));left:12px;right:12px;z-index:3;padding:12px 14px;background:rgba(10,28,22,.82);border:1px solid rgba(255,255,255,.14);border-radius:16px;backdrop-filter:blur(8px)}
-  h1{font-size:17px;margin:0 0 4px} #status{font-size:13px;line-height:1.4;color:#d7e8df}
-  #cameraFallback{position:absolute;inset:0;display:grid;place-content:center;text-align:center;padding:32px;color:#d7e8df;gap:10px}
-  #cameraFallback strong{font-size:21px}
-  #cameraFallback p{font-size:14px;line-height:1.5;max-width:340px;margin:0 auto}
-  #controls{position:absolute;z-index:3;bottom:calc(12px + env(safe-area-inset-bottom));left:12px;right:12px;display:grid;gap:9px;max-width:600px;margin:auto}
-  .row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-  button{border:1px solid rgba(255,255,255,.2);border-radius:12px;min-height:46px;padding:10px 8px;background:rgba(15,35,28,.94);color:white;font:600 13px system-ui;cursor:pointer;touch-action:manipulation}
-  button.primary{background:#1c9b5d;border-color:#1c9b5d;color:#fff}
-  button.selected{outline:2px solid #fff;outline-offset:1px}
-  button:disabled{opacity:.48}
-  #metrics{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:rgba(10,28,22,.86);font-size:12px;color:#e4f5ec}
-  #metrics strong{color:#fff}
-  #permissionNote{font-size:11px;text-align:center;color:#e2eee7;text-shadow:0 1px 4px #000}
-  #fileWarning{display:none;padding:12px;border-radius:12px;background:#6e3814;color:#fff;font-size:13px}
-  @media(min-width:700px){#controls{left:auto;width:380px}header{max-width:500px;right:auto;width:calc(100% - 24px)}}
+:root{color-scheme:dark;--bg:#0b1020;--card:#151d32;--line:#2b3856;--text:#eef3ff;--muted:#aab7d1;--blue:#70a7ff;--green:#6ee7a8;--red:#ff8585;--yellow:#ffd479}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#18284a 0%,var(--bg) 58%);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:22px 14px 40px}.wrap{max-width:720px;margin:auto}h1{font-size:clamp(27px,6vw,40px);line-height:1.1;margin:8px 0 10px}p{color:var(--muted)}.intro{font-size:17px}.card{background:rgba(21,29,50,.94);border:1px solid var(--line);border-radius:18px;padding:17px;margin:14px 0;box-shadow:0 12px 35px #0002}.row{display:flex;align-items:flex-start;gap:12px}.dot{width:12px;height:12px;border-radius:50%;background:#75829b;flex:none;margin-top:7px}.dot.ok{background:var(--green);box-shadow:0 0 14px #6ee7a855}.dot.no{background:var(--red)}.dot.warn{background:var(--yellow)}.status{font-weight:700}.detail{font-size:14px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}.buttons{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}button{border:0;border-radius:12px;padding:14px 16px;background:var(--blue);color:#081326;font-size:16px;font-weight:750;cursor:pointer}button.secondary{background:#263653;color:var(--text);border:1px solid #3c4e70}button:disabled{opacity:.55;cursor:wait}.small{font-size:13px}.result{padding:14px;border-radius:12px;background:#0e172a;border:1px solid var(--line);margin-top:12px}.result strong{display:block;margin-bottom:4px}.pill{display:inline-block;padding:4px 9px;border-radius:99px;background:#263653;color:#dbe7ff;font-size:12px;font-weight:700}.foot{font-size:13px;color:var(--muted)}a{color:#9bc1ff}ul{padding-left:20px;color:var(--muted)}li{margin:6px 0}#log{white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;color:#c5d4ee;overflow-wrap:anywhere}
 </style>
 </head>
-<body>
-<div id="stage">
-  <video id="camera" autoplay playsinline muted></video>
-  <div id="cameraFallback"><strong>Aravalli Lifeline AI</strong><p>Start the camera to begin the camera-overlay navigation demo. Camera access requires HTTPS or localhost.</p></div>
-  <canvas id="overlay"></canvas>
-  <div id="shade"></div>
-  <header><h1>🧭 Aravalli Lifeline AI</h1><div id="status" role="status" aria-live="polite">Camera overlay demo · Tap Start Camera, then place Door and Bed on the screen.</div></header>
-  <div id="controls">
-    <div id="metrics"><span>Route: <strong id="routeState">Not set</strong></span><span>Screen path: <strong id="distance">—</strong></span></div>
-    <div class="row">
-      <button id="start" class="primary">Start Camera</button>
-      <button id="doorBtn" disabled class="selected">① Place Door</button>
-      <button id="bedBtn" disabled>② Place Bed</button>
-    </div>
-    <div class="row">
-      <button id="routeBtn" disabled>Draw Route</button>
-      <button id="resetBtn">Reset Points</button>
-      <button id="stopBtn" disabled>Stop Camera</button>
-    </div>
-    <div id="fileWarning">Camera access was blocked. Open this page through HTTPS (GitHub Pages/ngrok) or localhost, then allow camera permission.</div>
-    <div id="permissionNote">Demo overlay only — markers are screen-positioned, not anchored to the real floor.</div>
-  </div>
+<body><main class="wrap">
+<span class="pill">DEVICE DIAGNOSTIC · NO INSTALL</span>
+<h1>Markerless AR Support Check</h1>
+<p class="intro">Check whether this phone and browser can start <b>WebXR immersive AR with hit-testing</b> — the key browser capability for placing objects on real surfaces without a printed marker.</p>
+<div class="card">
+ <div class="row"><span class="dot" id="secureDot"></span><div><div class="status" id="secureTitle">Checking secure context…</div><div class="detail" id="secureDetail"></div></div></div>
+ <div style="height:14px"></div>
+ <div class="row"><span class="dot" id="apiDot"></span><div><div class="status" id="apiTitle">Checking WebXR API…</div><div class="detail" id="apiDetail"></div></div></div>
+ <div style="height:14px"></div>
+ <div class="row"><span class="dot" id="camDot"></span><div><div class="status" id="camTitle">Camera permission not tested</div><div class="detail" id="camDetail">Camera access is a separate check and does not prove AR tracking support.</div></div></div>
+ <div style="height:14px"></div>
+ <div class="row"><span class="dot" id="arDot"></span><div><div class="status" id="arTitle">Immersive AR not tested</div><div class="detail" id="arDetail">Tap the button below. Your browser may ask to start an AR session.</div></div></div>
+ <div class="buttons">
+  <button id="arBtn">Test markerless AR support</button>
+  <button id="camBtn" class="secondary">Test camera access only</button>
+ </div>
+ <div id="summary" class="result" hidden></div>
 </div>
+<div class="card"><b>What counts as confirmation?</b><ul><li><b>AR session starts and hit-test succeeds:</b> browser reports the core markerless AR capability.</li><li><b>Unsupported / session rejected:</b> this browser-device combination cannot use this WebXR path right now.</li><li><b>Camera works only:</b> that is not markerless AR; a camera overlay alone cannot anchor arrows to the room.</li></ul><p class="foot">Run this page in Chrome on the phone over HTTPS. If testing from a laptop, results only describe the laptop. Support can vary by browser, OS, Google Play Services for AR, and device configuration.</p></div>
+<div class="card"><b>Technical log</b><div id="log">Ready.</div></div>
+</main>
 <script>
-(() => {
-  const video = document.getElementById('camera');
-  const canvas = document.getElementById('overlay');
-  const ctx = canvas.getContext('2d');
-  const status = document.getElementById('status');
-  const fallback = document.getElementById('cameraFallback');
-  const fileWarning = document.getElementById('fileWarning');
-  const startBtn = document.getElementById('start');
-  const doorBtn = document.getElementById('doorBtn');
-  const bedBtn = document.getElementById('bedBtn');
-  const routeBtn = document.getElementById('routeBtn');
-  const resetBtn = document.getElementById('resetBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const routeState = document.getElementById('routeState');
-  const distance = document.getElementById('distance');
-  let stream = null;
-  let activeTool = 'door';
-  let door = null;
-  let bed = null;
-  let routeVisible = true;
-  let animationId = null;
-
-  function resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(innerWidth * dpr);
-    canvas.height = Math.round(innerHeight * dpr);
-    canvas.style.width = innerWidth + 'px';
-    canvas.style.height = innerHeight + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    draw();
-  }
-
-  function setStatus(text) { status.textContent = text; }
-  function updateUI() {
-    doorBtn.classList.toggle('selected', activeTool === 'door');
-    bedBtn.classList.toggle('selected', activeTool === 'bed');
-    doorBtn.disabled = !stream;
-    bedBtn.disabled = !stream;
-    routeBtn.disabled = !(door && bed);
-    stopBtn.disabled = !stream;
-    routeState.textContent = door && bed ? 'Ready' : door ? 'Door placed' : 'Not set';
-    if (door && bed) {
-      const px = Math.hypot(bed.x-door.x, bed.y-door.y);
-      distance.textContent = Math.round(px) + ' px';
-    } else distance.textContent = '—';
-  }
-
-  async function startCamera() {
-    fileWarning.style.display = 'none';
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      fileWarning.style.display = 'block';
-      setStatus('This browser does not provide camera access. Open via HTTPS or localhost.');
-      return;
-    }
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      video.srcObject = stream;
-      await video.play();
-      video.style.display = 'block';
-      fallback.style.display = 'none';
-      startBtn.disabled = true;
-      setStatus('Camera ready. Tap Place Door, then tap the camera image where the Door should appear. Repeat with Place Bed.');
-      updateUI();
-      drawLoop();
-    } catch (err) {
-      console.error(err);
-      stream = null;
-      fileWarning.style.display = 'block';
-      setStatus('Camera could not start: ' + (err.message || err.name) + '. Check permission and use HTTPS.');
-      updateUI();
-    }
-  }
-
-  function stopCamera() {
-    if (stream) stream.getTracks().forEach(track => track.stop());
-    stream = null;
-    video.pause(); video.srcObject = null; video.style.display = 'none';
-    fallback.style.display = 'grid';
-    if (animationId) cancelAnimationFrame(animationId);
-    animationId = null;
-    startBtn.disabled = false;
-    setStatus('Camera stopped. Start it again to continue.');
-    updateUI(); draw();
-  }
-
-  function drawLoop() { draw(); animationId = requestAnimationFrame(drawLoop); }
-
-  function roundedRect(x,y,w,h,r,fill) {
-    ctx.beginPath(); ctx.roundRect(x,y,w,h,r); ctx.fillStyle=fill; ctx.fill();
-  }
-
-  function drawMarker(point, label, color) {
-    if (!point) return;
-    const x = point.x, y = point.y;
-    // Layered pin gives a 3D-like appearance but is not a tracked 3D object.
-    ctx.save();
-    ctx.globalAlpha = .25; ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(x,y+17,20,7,0,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.shadowColor = color; ctx.shadowBlur = 18;
-    ctx.fillStyle = color;
-    ctx.beginPath(); ctx.arc(x,y-5,13,0,Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x-9,y+4); ctx.lineTo(x+9,y+4); ctx.lineTo(x,y+21); ctx.closePath(); ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#092016'; ctx.font = 'bold 13px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(label === 'DOOR' ? 'D' : 'B',x,y-5);
-    const w = label.length * 9 + 22;
-    roundedRect(x-w/2,y-47,w,25,8,'rgba(7,24,17,.92)');
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText(label,x,y-34);
-    ctx.restore();
-  }
-
-  function drawArrow(x,y,angle,scale=1) {
-    ctx.save(); ctx.translate(x,y); ctx.rotate(angle); ctx.scale(scale,scale);
-    ctx.shadowColor = '#42c9ff'; ctx.shadowBlur = 12;
-    ctx.fillStyle = '#42c9ff';
-    ctx.beginPath(); ctx.moveTo(0,-17); ctx.lineTo(12,1); ctx.lineTo(5,1); ctx.lineTo(5,13); ctx.lineTo(-5,13); ctx.lineTo(-5,1); ctx.lineTo(-12,1); ctx.closePath(); ctx.fill();
-    ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
-  }
-
-  function draw() {
-    const w = innerWidth, h = innerHeight;
-    ctx.clearRect(0,0,w,h);
-    if (door && bed && routeVisible) {
-      const dx = bed.x-door.x, dy = bed.y-door.y;
-      const len = Math.hypot(dx,dy);
-      const angle = Math.atan2(dy,dx) + Math.PI/2;
-      ctx.save();
-      ctx.strokeStyle = 'rgba(66,201,255,.88)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-      ctx.setLineDash([10,9]); ctx.beginPath(); ctx.moveTo(door.x,door.y+13); ctx.lineTo(bed.x,bed.y+13); ctx.stroke(); ctx.setLineDash([]);
-      const n = Math.max(1,Math.min(8,Math.floor(len/65)));
-      for (let i=1;i<=n;i++) {
-        const t=i/(n+1);
-        drawArrow(door.x+dx*t,door.y+dy*t,angle,.75+(.25*t));
-      }
-      ctx.restore();
-    }
-    drawMarker(door,'DOOR','#28d17c');
-    drawMarker(bed,'BED','#ffb454');
-    if (stream && !door && !bed) {
-      ctx.save(); ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=2;
-      ctx.beginPath(); ctx.arc(w/2,h/2,13,0,Math.PI*2); ctx.moveTo(w/2-21,h/2);ctx.lineTo(w/2-7,h/2);ctx.moveTo(w/2+7,h/2);ctx.lineTo(w/2+21,h/2);ctx.moveTo(w/2,h/2-21);ctx.lineTo(w/2,h/2-7);ctx.moveTo(w/2,h/2+7);ctx.lineTo(w/2,h/2+21);ctx.stroke();ctx.restore();
-    }
-  }
-
-  function pointFromEvent(event) {
-    const rect = canvas.getBoundingClientRect();
-    return { x: Math.max(12,Math.min(innerWidth-12,event.clientX-rect.left)), y: Math.max(90,Math.min(innerHeight-115,event.clientY-rect.top)) };
-  }
-
-  canvas.addEventListener('pointerdown', event => {
-    if (!stream) return;
-    const point = pointFromEvent(event);
-    if (activeTool === 'door') {
-      door = point; routeVisible = true;
-      activeTool = 'bed';
-      setStatus('Door marker placed on the screen. Now choose Place Bed and tap its screen position.');
-    } else {
-      bed = point; routeVisible = true;
-      setStatus('Bed marker placed. The demo route is shown between the two screen points.');
-    }
-    updateUI(); draw();
-  });
-
-  startBtn.addEventListener('click', startCamera);
-  stopBtn.addEventListener('click', stopCamera);
-  doorBtn.addEventListener('click', () => { activeTool='door'; setStatus('Tap the camera view to position the Door marker.'); updateUI(); });
-  bedBtn.addEventListener('click', () => { activeTool='bed'; setStatus('Tap the camera view to position the Bed marker.'); updateUI(); });
-  routeBtn.addEventListener('click', () => { routeVisible=true; draw(); setStatus('Route displayed. These arrows are a visual overlay, not floor-anchored guidance.'); });
-  resetBtn.addEventListener('click', () => { door=null; bed=null; routeVisible=true; activeTool='door'; updateUI(); draw(); setStatus(stream ? 'Reset complete. Tap Place Door and choose its screen position.' : 'Points cleared. Start the camera to begin.'); });
-  window.addEventListener('resize', resize);
-  window.addEventListener('pagehide', () => { if (stream) stream.getTracks().forEach(track => track.stop()); });
-  resize(); updateUI();
-})();
-</script>
-</body>
-</html>
+const $=id=>document.getElementById(id); const logLines=[];
+function log(s){logLines.push(new Date().toLocaleTimeString()+"  "+s);$('log').textContent=logLines.slice(-14).join('\n')}
+function setState(prefix,state,title,detail){$(prefix+'Dot').className='dot '+(state==='ok'?'ok':state==='no'?'no':state==='warn'?'warn':'');$(prefix+'Title').textContent=title;$(prefix+'Detail').textContent=detail||''}
+function init(){
+ const secure=window.isSecureContext;
+ setState('secure',secure?'ok':'no',secure?'Secure context: yes':'Secure context: no',location.protocol+' — WebXR needs HTTPS or localhost.');
+ const hasXR=!!(navigator.xr&&navigator.xr.isSessionSupported);
+ setState('api',hasXR?'ok':'no',hasXR?'WebXR API detected':'WebXR API not detected',hasXR?'This browser exposes the WebXR support check. This alone does not prove AR is supported.':'Try Chrome on the Android phone using an HTTPS URL.');
+ log('Page loaded: '+location.href);log('Secure context: '+secure);log('WebXR API: '+hasXR);
+}
+async function testCamera(){const b=$('camBtn');b.disabled=true;try{if(!navigator.mediaDevices?.getUserMedia)throw new Error('getUserMedia API unavailable');const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});stream.getTracks().forEach(t=>t.stop());setState('cam','ok','Camera access: successful','Browser granted camera access. This does not confirm AR tracking.');log('Camera permission succeeded.');}catch(e){setState('cam','no','Camera access: failed',e.name+': '+e.message);log('Camera test failed: '+e.name+' '+e.message);}finally{b.disabled=false}}
+async function testAR(){const b=$('arBtn');b.disabled=true;$('summary').hidden=true;try{
+ if(!window.isSecureContext)throw new Error('Not a secure context. Open this page over HTTPS.');
+ if(!navigator.xr||!navigator.xr.isSessionSupported)throw new Error('WebXR API unavailable in this browser.');
+ const supported=await navigator.xr.isSessionSupported('immersive-ar');
+ log('isSessionSupported(immersive-ar): '+supported);
+ if(!supported){setState('ar','no','Markerless WebXR AR: not supported','This browser/device reports immersive-ar is unavailable.');$('summary').hidden=false;$('summary').innerHTML='<strong>Result: NOT SUPPORTED via WebXR</strong>Try a supported Android Chrome + ARCore combination, or a native AR app. Camera access alone is not enough.';return;}
+ setState('ar','warn','Immersive AR is reported as supported','Requesting an AR session with hit-test. Accept any browser/device prompt.');
+ let session;
+ try{session=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['hit-test'],optionalFeatures:['dom-overlay']});}
+ catch(e){throw new Error('AR session / hit-test request failed: '+e.name+' — '+e.message)}
+ let hitResult='Session started, but hit-test source not checked.';
+ try{const space=await session.requestReferenceSpace('viewer');const source=await session.requestHitTestSource({space});hitResult=source?'Hit-test source created successfully.':'Hit-test source unavailable.';}catch(e){hitResult='Session started, but hit-test failed: '+e.name+' — '+e.message;}
+ await session.end().catch(()=>{});
+ if(hitResult.startsWith('Hit-test source created')){setState('ar','ok','MARKERLESS AR SUPPORTED','Immersive AR session and hit-test both succeeded.');$('summary').innerHTML='<strong>Result: CORE MARKERLESS AR CAPABILITY CONFIRMED</strong>'+hitResult+'<br>Next step: build the Door → Bed placement demo. Actual tracking quality still needs a real-room test.';log(hitResult);}
+ else{setState('ar','warn','Partial support only',hitResult);$('summary').innerHTML='<strong>Result: PARTIAL SUPPORT</strong>'+hitResult+'<br>The browser started AR, but surface hit-testing did not confirm.';log(hitResult)}
+ $('summary').hidden=false;
+ }catch(e){setState('ar','no','Markerless AR test failed',e.message||String(e));$('summary').hidden=false;$('summary').innerHTML='<strong>Result: NOT CONFIRMED</strong>'+String(e.message||e)+'<br>Check Chrome, HTTPS, ARCore / Google Play Services for AR availability, and browser permissions.';log('AR test failed: '+(e.name||'Error')+' '+(e.message||String(e)));}finally{b.disabled=false}}
+$('arBtn').addEventListener('click',testAR);$('camBtn').addEventListener('click',testCamera);init();
+</script></body></html>
