@@ -1,62 +1,59 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Markerless AR Support Check</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aravalli Lifeline AI — Live Location</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <style>
-:root{color-scheme:dark;--bg:#0b1020;--card:#151d32;--line:#2b3856;--text:#eef3ff;--muted:#aab7d1;--blue:#70a7ff;--green:#6ee7a8;--red:#ff8585;--yellow:#ffd479}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#18284a 0%,var(--bg) 58%);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:22px 14px 40px}.wrap{max-width:720px;margin:auto}h1{font-size:clamp(27px,6vw,40px);line-height:1.1;margin:8px 0 10px}p{color:var(--muted)}.intro{font-size:17px}.card{background:rgba(21,29,50,.94);border:1px solid var(--line);border-radius:18px;padding:17px;margin:14px 0;box-shadow:0 12px 35px #0002}.row{display:flex;align-items:flex-start;gap:12px}.dot{width:12px;height:12px;border-radius:50%;background:#75829b;flex:none;margin-top:7px}.dot.ok{background:var(--green);box-shadow:0 0 14px #6ee7a855}.dot.no{background:var(--red)}.dot.warn{background:var(--yellow)}.status{font-weight:700}.detail{font-size:14px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}.buttons{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}button{border:0;border-radius:12px;padding:14px 16px;background:var(--blue);color:#081326;font-size:16px;font-weight:750;cursor:pointer}button.secondary{background:#263653;color:var(--text);border:1px solid #3c4e70}button:disabled{opacity:.55;cursor:wait}.small{font-size:13px}.result{padding:14px;border-radius:12px;background:#0e172a;border:1px solid var(--line);margin-top:12px}.result strong{display:block;margin-bottom:4px}.pill{display:inline-block;padding:4px 9px;border-radius:99px;background:#263653;color:#dbe7ff;font-size:12px;font-weight:700}.foot{font-size:13px;color:var(--muted)}a{color:#9bc1ff}ul{padding-left:20px;color:var(--muted)}li{margin:6px 0}#log{white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;color:#c5d4ee;overflow-wrap:anywhere}
-</style>
-</head>
-<body><main class="wrap">
-<span class="pill">DEVICE DIAGNOSTIC · NO INSTALL</span>
-<h1>Markerless AR Support Check</h1>
-<p class="intro">Check whether this phone and browser can start <b>WebXR immersive AR with hit-testing</b> — the key browser capability for placing objects on real surfaces without a printed marker.</p>
-<div class="card">
- <div class="row"><span class="dot" id="secureDot"></span><div><div class="status" id="secureTitle">Checking secure context…</div><div class="detail" id="secureDetail"></div></div></div>
- <div style="height:14px"></div>
- <div class="row"><span class="dot" id="apiDot"></span><div><div class="status" id="apiTitle">Checking WebXR API…</div><div class="detail" id="apiDetail"></div></div></div>
- <div style="height:14px"></div>
- <div class="row"><span class="dot" id="camDot"></span><div><div class="status" id="camTitle">Camera permission not tested</div><div class="detail" id="camDetail">Camera access is a separate check and does not prove AR tracking support.</div></div></div>
- <div style="height:14px"></div>
- <div class="row"><span class="dot" id="arDot"></span><div><div class="status" id="arTitle">Immersive AR not tested</div><div class="detail" id="arDetail">Tap the button below. Your browser may ask to start an AR session.</div></div></div>
- <div class="buttons">
-  <button id="arBtn">Test markerless AR support</button>
-  <button id="camBtn" class="secondary">Test camera access only</button>
- </div>
- <div id="summary" class="result" hidden></div>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,Arial,sans-serif;background:#f4f7fb;color:#172033}
+header{padding:18px;background:white;border-bottom:1px solid #ddd}.wrap,main{max-width:950px;margin:auto}h1{font-size:1.5rem;margin:0 0 5px}.sub,.note{color:#5f6b7a}
+main{padding:14px}.controls{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:10px}
+button{padding:12px 15px;border:0;border-radius:11px;font-size:1rem;font-weight:700;cursor:pointer}
+#start{background:#1769ff;color:white}#stop{background:#e5eaf1;color:#172033}#status{width:100%;min-height:1.4em;color:#5f6b7a}
+#map{height:58vh;min-height:320px;border:1px solid #d9e1ec;border-radius:14px;overflow:hidden}
+.info{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:10px}.tile{padding:12px;background:white;border:1px solid #e2e8f0;border-radius:12px;overflow-wrap:anywhere}
+.label{font-size:.8rem;color:#5f6b7a;margin-bottom:5px}.value{font-weight:700}.note{font-size:.87rem;line-height:1.5}
+.dot{width:18px;height:18px;border-radius:50%;background:#1677ff;border:3px solid white;box-shadow:0 0 0 7px #1677ff30,0 1px 5px #64748b}
+@media(max-width:560px){.info{grid-template-columns:1fr}#map{height:55vh}}
+</style></head>
+<body>
+<header><div class="wrap"><h1>Aravalli Lifeline AI</h1><div class="sub">Free 2D map with live GPS location</div></div></header>
+<main>
+<div class="controls"><button id="start">📍 Use My Live Location</button><button id="stop" disabled>Stop tracking</button><div id="status" role="status">Tap “Use My Live Location” and allow location access.</div></div>
+<div id="map"></div>
+<div class="info">
+<div class="tile"><div class="label">Latitude</div><div class="value" id="lat">—</div></div>
+<div class="tile"><div class="label">Longitude</div><div class="value" id="lon">—</div></div>
+<div class="tile"><div class="label">GPS accuracy</div><div class="value" id="accuracy">—</div></div>
 </div>
-<div class="card"><b>What counts as confirmation?</b><ul><li><b>AR session starts and hit-test succeeds:</b> browser reports the core markerless AR capability.</li><li><b>Unsupported / session rejected:</b> this browser-device combination cannot use this WebXR path right now.</li><li><b>Camera works only:</b> that is not markerless AR; a camera overlay alone cannot anchor arrows to the room.</li></ul><p class="foot">Run this page in Chrome on the phone over HTTPS. If testing from a laptop, results only describe the laptop. Support can vary by browser, OS, Google Play Services for AR, and device configuration.</p></div>
-<div class="card"><b>Technical log</b><div id="log">Ready.</div></div>
+<p class="note">Map data © OpenStreetMap contributors. Coordinates are handled in this browser and are not sent to a custom server. GPS can be inaccurate indoors; this is a GPS test, not precise indoor navigation. Use HTTPS (such as GitHub Pages) or localhost.</p>
 </main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
-const $=id=>document.getElementById(id); const logLines=[];
-function log(s){logLines.push(new Date().toLocaleTimeString()+"  "+s);$('log').textContent=logLines.slice(-14).join('\n')}
-function setState(prefix,state,title,detail){$(prefix+'Dot').className='dot '+(state==='ok'?'ok':state==='no'?'no':state==='warn'?'warn':'');$(prefix+'Title').textContent=title;$(prefix+'Detail').textContent=detail||''}
-function init(){
- const secure=window.isSecureContext;
- setState('secure',secure?'ok':'no',secure?'Secure context: yes':'Secure context: no',location.protocol+' — WebXR needs HTTPS or localhost.');
- const hasXR=!!(navigator.xr&&navigator.xr.isSessionSupported);
- setState('api',hasXR?'ok':'no',hasXR?'WebXR API detected':'WebXR API not detected',hasXR?'This browser exposes the WebXR support check. This alone does not prove AR is supported.':'Try Chrome on the Android phone using an HTTPS URL.');
- log('Page loaded: '+location.href);log('Secure context: '+secure);log('WebXR API: '+hasXR);
+const map=L.map('map').setView([20.5937,78.9629],5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>'}).addTo(map);
+let watchId=null,marker=null,circle=null,firstFix=true;
+const statusEl=document.getElementById('status'),startBtn=document.getElementById('start'),stopBtn=document.getElementById('stop');
+function startTracking(){
+ if(!navigator.geolocation){statusEl.textContent='Geolocation is not supported by this browser.';return}
+ if(!window.isSecureContext){statusEl.textContent='Location requires HTTPS or localhost. Deploy this page to GitHub Pages or run on localhost.';return}
+ if(watchId!==null)return;
+ firstFix=true;statusEl.textContent='Requesting location… allow the permission prompt if it appears.';startBtn.disabled=true;stopBtn.disabled=false;
+ watchId=navigator.geolocation.watchPosition(pos=>{
+  const c=pos.coords,p=[c.latitude,c.longitude];
+  document.getElementById('lat').textContent=c.latitude.toFixed(6);
+  document.getElementById('lon').textContent=c.longitude.toFixed(6);
+  document.getElementById('accuracy').textContent='± '+Math.round(c.accuracy)+' metres';
+  if(!marker){const icon=L.divIcon({className:'',html:'<div class="dot"></div>',iconSize:[18,18],iconAnchor:[9,9]});marker=L.marker(p,{icon}).addTo(map).bindPopup('Your current GPS location');circle=L.circle(p,{radius:c.accuracy,color:'#1677ff',weight:1,fillColor:'#1677ff',fillOpacity:.1}).addTo(map)}
+  else{marker.setLatLng(p);circle.setLatLng(p);circle.setRadius(c.accuracy)}
+  if(firstFix){map.setView(p,17);marker.openPopup();firstFix=false}
+  statusEl.textContent='Live location active. Updated '+new Date(pos.timestamp).toLocaleTimeString()+'.';
+ },err=>{
+  const m={1:'Location permission denied. Allow Location for this site in Brave settings, then retry.',2:'Phone could not determine location. Turn GPS on and try outdoors.',3:'Location timed out. Try again in an open area.'};
+  statusEl.textContent=m[err.code]||'Could not get location: '+err.message;
+  if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;startBtn.disabled=false;stopBtn.disabled=true;
+ },{enableHighAccuracy:true,maximumAge:2000,timeout:20000});
 }
-async function testCamera(){const b=$('camBtn');b.disabled=true;try{if(!navigator.mediaDevices?.getUserMedia)throw new Error('getUserMedia API unavailable');const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});stream.getTracks().forEach(t=>t.stop());setState('cam','ok','Camera access: successful','Browser granted camera access. This does not confirm AR tracking.');log('Camera permission succeeded.');}catch(e){setState('cam','no','Camera access: failed',e.name+': '+e.message);log('Camera test failed: '+e.name+' '+e.message);}finally{b.disabled=false}}
-async function testAR(){const b=$('arBtn');b.disabled=true;$('summary').hidden=true;try{
- if(!window.isSecureContext)throw new Error('Not a secure context. Open this page over HTTPS.');
- if(!navigator.xr||!navigator.xr.isSessionSupported)throw new Error('WebXR API unavailable in this browser.');
- const supported=await navigator.xr.isSessionSupported('immersive-ar');
- log('isSessionSupported(immersive-ar): '+supported);
- if(!supported){setState('ar','no','Markerless WebXR AR: not supported','This browser/device reports immersive-ar is unavailable.');$('summary').hidden=false;$('summary').innerHTML='<strong>Result: NOT SUPPORTED via WebXR</strong>Try a supported Android Chrome + ARCore combination, or a native AR app. Camera access alone is not enough.';return;}
- setState('ar','warn','Immersive AR is reported as supported','Requesting an AR session with hit-test. Accept any browser/device prompt.');
- let session;
- try{session=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['hit-test'],optionalFeatures:['dom-overlay']});}
- catch(e){throw new Error('AR session / hit-test request failed: '+e.name+' — '+e.message)}
- let hitResult='Session started, but hit-test source not checked.';
- try{const space=await session.requestReferenceSpace('viewer');const source=await session.requestHitTestSource({space});hitResult=source?'Hit-test source created successfully.':'Hit-test source unavailable.';}catch(e){hitResult='Session started, but hit-test failed: '+e.name+' — '+e.message;}
- await session.end().catch(()=>{});
- if(hitResult.startsWith('Hit-test source created')){setState('ar','ok','MARKERLESS AR SUPPORTED','Immersive AR session and hit-test both succeeded.');$('summary').innerHTML='<strong>Result: CORE MARKERLESS AR CAPABILITY CONFIRMED</strong>'+hitResult+'<br>Next step: build the Door → Bed placement demo. Actual tracking quality still needs a real-room test.';log(hitResult);}
- else{setState('ar','warn','Partial support only',hitResult);$('summary').innerHTML='<strong>Result: PARTIAL SUPPORT</strong>'+hitResult+'<br>The browser started AR, but surface hit-testing did not confirm.';log(hitResult)}
- $('summary').hidden=false;
- }catch(e){setState('ar','no','Markerless AR test failed',e.message||String(e));$('summary').hidden=false;$('summary').innerHTML='<strong>Result: NOT CONFIRMED</strong>'+String(e.message||e)+'<br>Check Chrome, HTTPS, ARCore / Google Play Services for AR availability, and browser permissions.';log('AR test failed: '+(e.name||'Error')+' '+(e.message||String(e)));}finally{b.disabled=false}}
-$('arBtn').addEventListener('click',testAR);$('camBtn').addEventListener('click',testCamera);init();
+function stopTracking(){if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;startBtn.disabled=false;stopBtn.disabled=true;statusEl.textContent='Live tracking stopped. Last position remains on the map.'}
+startBtn.addEventListener('click',startTracking);stopBtn.addEventListener('click',stopTracking);
 </script></body></html>
